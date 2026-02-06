@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="Styles.css">
+  </head>
+  <body>
+    <div class="sidebar">
+      <h1>Crunchy Sheets AI</h1>
+      <div class="skills-section">
+        <h2>Financial Skills</h2>
+        <select id="skillSelector" multiple>
+          <option value="personal_budget">Personal Budget Builder</option>
+          <option value="cash_flow_forecast">Cash Flow Forecaster</option>
+          <option value="bank_transaction_analysis">Bank Transaction Analyzer</option>
+          <option value="workbook_health_check">Workbook Health Check</option>
+          <option value="financial_model_templates">Financial Model Template Library</option>
+          <option value="tax_prep_organizer">Tax Prep Organizer</option>
+          <option value="subscription_tracker">Subscription Tracker</option>
+          <option value="investor_update_generator">Investor Update Generator</option>
+          <option value="scenario_modeler">Scenario Modeler</option>
+          <option value="financial_statement_exporter">Financial Statement Exporter</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button onclick="google.script.run.invokeAIAnalysis()">Analyze Workbook</button>
+      </div>
+      <div class="status-area" id="statusArea"></div>
+    </div>
+    <script>
+      function updateStatus(message) {
+        document.getElementById('statusArea').textContent = message;
+      }
+    </script>
+  </body>
+</html>

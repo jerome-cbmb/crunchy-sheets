@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      color: #202124;
+      background: #f8f9fa;
+      padding: 16px;
+    }
+
+    .header {
+      text-align: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #dadce0;
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: #1a73e8;
+    }
+
+    .header .subtitle {
+      font-size: 11px;
+      color: #5f6368;
+      margin-top: 4px;
+    }
+
+    .user-info {
+      font-size: 11px;
+      color: #5f6368;
+      text-align: center;
+      margin-bottom: 16px;
+      padding: 8px;
+      background: #e8f0fe;
+      border-radius: 8px;
+    }
+
+    /* Chat area */
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 240px);
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .message {
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 90%;
+    }
+
+    .message.user {
+      background: #1a73e8;
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant {
+      background: white;
+      border: 1px solid #dadce0;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.system {
+      background: #fef7e0;
+      border: 1px solid #fdd835;
+      font-size: 11px;
+      text-align: center;
+      max-width: 100%;
+    }
+
+    /* Input area */
+    .input-area {
+      display: flex;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid #dadce0;
+    }
+
+    .input-area textarea {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: none;
+      rows: 2;
+      outline: none;
+    }
+
+    .input-area textarea:focus {
+      border-color: #1a73e8;
+    }
+
+    .input-area button {
+      padding: 10px 16px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .input-area button:hover { background: #1557b0; }
+    .input-area button:disabled {
+      background: #dadce0;
+      cursor: not-allowed;
+    }
+
+    /* Skill selector */
+    .skill-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 8px 0;
+      margin-bottom: 8px;
+    }
+
+    .skill-chip {
+      display: inline-block;
+      padding: 4px 10px;
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 16px;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      color: #5f6368;
+      transition: all 0.15s;
+    }
+
+    .skill-chip:hover { border-color: #1a73e8; color: #1a73e8; }
+    .skill-chip.active {
+      background: #e8f0fe;
+      border-color: #1a73e8;
+      color: #1a73e8;
+    }
+
+    .loading { opacity: 0.6; pointer-events: none; }
+
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #dadce0;
+      border-top: 2px solid #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>🥜 Crunchy Sheets</h1>
+    <div class="subtitle">AI CFO for Google Sheets</div>
+  </div>
+
+  <div class="user-info" id="userInfo">Connecting...</div>
+
+  <!-- Skill chips -->
+  <div class="skill-bar" id="skillBar"></div>
+
+  <!-- Chat -->
+  <div class="chat-container">
+    <div class="messages" id="messages">
+      <div class="message system">
+        Ask me anything about your workbook — or pick a skill above.
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea id="prompt" rows="2" placeholder="What would you like to analyze?" onkeydown="handleKey(event)"></textarea>
+      <button id="sendBtn" onclick="send()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    var selectedSkill = null;
+
+    // ─── Init ──────────────────────────────────────────────────────────
+    (function init() {
+      // Load user info
+      google.script.run
+        .withSuccessHandler(function(status) {
+          var el = document.getElementById('userInfo');
+          if (status.authorized) {
+            el.textContent = '✓ Signed in as ' + status.email;
+          } else {
+            el.textContent = '⚠ Not authorized — please re-open the add-on.';
+          }
+        })
+        .checkAuthStatus();
+
+      // Load skill chips
+      google.script.run
+        .withSuccessHandler(function(skills) {
+          var bar = document.getElementById('skillBar');
+          skills.forEach(function(skill) {
+            var chip = document.createElement('div');
+            chip.className = 'skill-chip';
+            chip.textContent = skill.name;
+            chip.dataset.id = skill.id;
+            chip.onclick = function() {
+              document.querySelectorAll('.skill-chip').forEach(function(c) { c.classList.remove('active'); });
+              if (selectedSkill === skill.id) {
+                selectedSkill = null;
+              } else {
+                chip.classList.add('active');
+                selectedSkill = skill.id;
+              }
+            };
+            bar.appendChild(chip);
+          });
+        })
+        .getSkillRegistry();
+    })();
+
+    // ─── Chat ──────────────────────────────────────────────────────────
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    }
+
+    function send() {
+      var input = document.getElementById('prompt');
+      var text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, 'user');
+      input.value = '';
+      setLoading(true);
+
+      // Prepend skill hint if selected
+      var fullPrompt = text;
+      if (selectedSkill) {
+        fullPrompt = '[skill:' + selectedSkill + '] ' + text;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          setLoading(false);
+          if (result && result.response) {
+            addMessage(result.response, 'assistant');
+          } else if (result && result.error) {
+            addMessage('⚠ ' + result.error, 'system');
+          } else {
+            addMessage('No response received.', 'system');
+          }
+        })
+        .withFailureHandler(function(err) {
+          setLoading(false);
+          addMessage('⚠ Error: ' + err.message, 'system');
+        })
+        .analyzeWorkbook(fullPrompt);
+    }
+
+    function addMessage(text, role) {
+      var container = document.getElementById('messages');
+      var div = document.createElement('div');
+      div.className = 'message ' + role;
+      div.textContent = text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function setLoading(on) {
+      var btn = document.getElementById('sendBtn');
+      btn.disabled = on;
+      btn.innerHTML = on ? '<span class="spinner"></span>Thinking...' : 'Send';
+    }
+  </script>
+
+</body>
+</html>

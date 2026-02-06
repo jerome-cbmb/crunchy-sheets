@@ -1,0 +1,27 @@
+{
+  "name": "crunchy-sheets-backend",
+  "version": "0.1.0",
+  "description": "Cloud Functions backend for Crunchy Sheets — AI CFO for Google Sheets",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "serve": "npm run build && npx @google-cloud/functions-framework --target=analyze --port=8080",
+    "deploy:analyze": "gcloud functions deploy analyze --runtime nodejs20 --trigger-http --allow-unauthenticated --project crunchy-sheets --region us-central1 --source . --entry-point analyze --set-env-vars ANTHROPIC_API_KEY=$(cat ~/.config/secrets/anthropic-crunchy-sheets-key),SUPABASE_URL=https://diselpdcsgjgetgmixhc.supabase.co,SUPABASE_SERVICE_KEY=$(cat ~/.config/secrets/supabase-crunchy-sheets-service-key)",
+    "deploy:auth": "gcloud functions deploy auth --runtime nodejs20 --trigger-http --allow-unauthenticated --project crunchy-sheets --region us-central1 --source . --entry-point auth --set-env-vars SUPABASE_URL=https://diselpdcsgjgetgmixhc.supabase.co,SUPABASE_SERVICE_KEY=$(cat ~/.config/secrets/supabase-crunchy-sheets-service-key)",
+    "deploy": "npm run build && npm run deploy:analyze && npm run deploy:auth"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google-cloud/functions-framework": "^3.3.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "google-auth-library": "^9.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

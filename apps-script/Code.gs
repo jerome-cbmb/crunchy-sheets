@@ -93,11 +93,23 @@ function analyzeWorkbook(userPrompt) {
   };
 
   var response = UrlFetchApp.fetch(CLOUD_FUNCTION_BASE + '/analyze', options);
-  var result = JSON.parse(response.getContentText());
+  var responseCode = response.getResponseCode();
+  var responseText = response.getContentText();
+
+  var result;
+  try {
+    result = JSON.parse(responseText);
+  } catch (e) {
+    // Cloud Function returned non-JSON (GCP infrastructure error, timeout, etc.)
+    Logger.log('Non-JSON response (' + responseCode + '): ' + responseText.substring(0, 500));
+    return { error: responseCode + ': ' + responseText.substring(0, 200) };
+  }
+
+  if (result.error) {
+    return result;
+  }
 
   if (result.actions && result.actions.length > 0) {
-    // Actions are returned to the sidebar for user confirmation before applying.
-    // The sidebar will call applyActions() after the user clicks "Apply All".
     Logger.log('Actions received: ' + result.actions.length + ' — awaiting user confirmation in sidebar');
   }
 
@@ -145,7 +157,16 @@ function runHealthCheck() {
   };
 
   var response = UrlFetchApp.fetch(CLOUD_FUNCTION_BASE + '/analyze', options);
-  var result = JSON.parse(response.getContentText());
+  var responseCode = response.getResponseCode();
+  var responseText = response.getContentText();
 
-  SpreadsheetApp.getUi().alert('Health Check', result.summary || 'Complete.', SpreadsheetApp.getUi().ButtonSet.OK);
+  var result;
+  try {
+    result = JSON.parse(responseText);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Health Check Error', responseCode + ': ' + responseText.substring(0, 200), SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  SpreadsheetApp.getUi().alert('Health Check', result.summary || result.error || 'Complete.', SpreadsheetApp.getUi().ButtonSet.OK);
 }

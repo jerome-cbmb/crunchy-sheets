@@ -13,6 +13,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Request } from '@google-cloud/functions-framework';
 import { verifyGoogleToken } from './auth';
 import { routeToSkill, SkillContext } from './skill-router';
+import { parseClaudeResponse, buildActionInstructions } from './action-parser';
 import { createClient } from '@supabase/supabase-js';
 
 // ─── Clients ─────────────────────────────────────────────────────────────────
@@ -47,7 +48,9 @@ When asked to analyze, return your analysis in the "response" field as clear,
 concise financial commentary. Reference specific cells (e.g., "Cell B14 shows...").
 
 Always be opinionated about structure. A well-organized model is worth more than
-a technically correct but messy one.`;
+a technically correct but messy one.
+
+${buildActionInstructions()}`;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,7 +62,7 @@ interface AnalyzeRequest {
   userEmail: string;
 }
 
-interface CellAction {
+export interface CellAction {
   type: 'set_value' | 'set_formula' | 'format_cell' | 'add_sheet' | 'rename_sheet' | 'add_named_range';
   sheet?: string;
   cell?: string;
@@ -84,6 +87,7 @@ interface AnalyzeResponse {
   tokensIn: number;
   tokensOut: number;
   summary?: string;
+  parseErrors?: string[];
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -127,15 +131,18 @@ export async function handleAnalyze(req: Request): Promise<AnalyzeResponse> {
     .map(block => block.text)
     .join('\n');
 
-  // TODO: Parse structured actions from Claude's response
-  // For now, return the raw text response
+  // Parse structured actions from Claude's response
+  const parsed = parseClaudeResponse(responseText);
+
   const result: AnalyzeResponse = {
-    response: responseText,
-    actions: [], // TODO: Parse actions from response
+    response: parsed.response,
+    actions: parsed.actions,
     skill: skillContext.skillId,
     model,
     tokensIn: message.usage.input_tokens,
     tokensOut: message.usage.output_tokens,
+    summary: parsed.summary,
+    ...(parsed.parseErrors && { parseErrors: parsed.parseErrors }),
   };
 
   // 7. Track usage in Supabase

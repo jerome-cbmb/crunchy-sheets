@@ -1,0 +1,367 @@
+/**
+ * ActionExecutor.gs — Execute CellAction Arrays Against the Active Spreadsheet
+ *
+ * Takes an array of CellAction objects returned by Claude (via the backend)
+ * and applies them to the active spreadsheet. Each action is independently
+ * try/caught so one failure doesn't stop the batch.
+ *
+ * CellAction types:
+ *   - set_value:       Set a cell's value (string, number, boolean)
+ *   - set_formula:     Set a cell's formula (must start with '=')
+ *   - format_cell:     Apply formatting (color, bold, numberFormat, etc.)
+ *   - add_sheet:       Create a new sheet (skip if it already exists)
+ *   - rename_sheet:    Rename an existing sheet
+ *   - add_named_range: Create a named range
+ *
+ * Financial formatting conventions:
+ *   Blue (#0000FF)  → hard-coded inputs
+ *   Black (#000000) → formulas
+ *   Green (#008000) → cross-tab references
+ */
+
+/**
+ * Main entry point. Executes an array of CellAction objects.
+ *
+ * @param {Array} actions - Array of CellAction objects from the backend.
+ * @return {Object} Result summary: { applied, skipped, errors }
+ */
+function executeActions(actions) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var applied = 0;
+  var skipped = 0;
+  var errors = [];
+
+  if (!actions || !Array.isArray(actions)) {
+    return { applied: 0, skipped: 0, errors: ['No valid actions array provided'] };
+  }
+
+  for (var i = 0; i < actions.length; i++) {
+    var action = actions[i];
+    try {
+      var result = _executeSingleAction(ss, action, i);
+      if (result.skipped) {
+        skipped++;
+        Logger.log('[ActionExecutor] Skipped action ' + i + ': ' + result.reason);
+      } else {
+        applied++;
+        Logger.log('[ActionExecutor] Applied action ' + i + ': ' + _describeAction(action));
+      }
+    } catch (e) {
+      errors.push('Action ' + i + ' (' + (action.type || 'unknown') + '): ' + e.message);
+      Logger.log('[ActionExecutor] Error on action ' + i + ': ' + e.message);
+    }
+  }
+
+  Logger.log('[ActionExecutor] Complete — applied: ' + applied + ', skipped: ' + skipped + ', errors: ' + errors.length);
+
+  return {
+    applied: applied,
+    skipped: skipped,
+    errors: errors
+  };
+}
+
+// ─── Single Action Dispatch ──────────────────────────────────────────────────
+
+/**
+ * Execute a single action against the spreadsheet.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Active spreadsheet.
+ * @param {Object} action - A single CellAction object.
+ * @param {number} index - Index in the batch (for logging).
+ * @return {Object} { skipped: boolean, reason?: string }
+ */
+function _executeSingleAction(ss, action, index) {
+  switch (action.type) {
+    case 'set_value':
+      return _execSetValue(ss, action);
+
+    case 'set_formula':
+      return _execSetFormula(ss, action);
+
+    case 'format_cell':
+      return _execFormatCell(ss, action);
+
+    case 'add_sheet':
+      return _execAddSheet(ss, action);
+
+    case 'rename_sheet':
+      return _execRenameSheet(ss, action);
+
+    case 'add_named_range':
+      return _execAddNamedRange(ss, action);
+
+    default:
+      throw new Error('Unknown action type: ' + action.type);
+  }
+}
+
+// ─── Action Handlers ─────────────────────────────────────────────────────────
+
+/**
+ * set_value — Set a cell's value (string, number, or boolean).
+ * Expected fields: { type, sheet, cell, value }
+ */
+function _execSetValue(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var range = sheet.getRange(action.cell);
+  var val = action.value;
+
+  // Coerce types if needed
+  if (typeof val === 'string') {
+    // Check if it's a number in string form
+    var numVal = Number(val);
+    if (val !== '' && !isNaN(numVal)) {
+      val = numVal;
+    }
+    // Check for booleans
+    else if (val.toLowerCase() === 'true') {
+      val = true;
+    } else if (val.toLowerCase() === 'false') {
+      val = false;
+    }
+  }
+
+  range.setValue(val);
+  return { skipped: false };
+}
+
+/**
+ * set_formula — Set a cell's formula. Must start with '='.
+ * Expected fields: { type, sheet, cell, formula }
+ */
+function _execSetFormula(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var range = sheet.getRange(action.cell);
+  var formula = action.formula;
+
+  // Validate that it starts with '='
+  if (!formula || formula.charAt(0) !== '=') {
+    throw new Error('Formula must start with "=": got "' + (formula || '') + '"');
+  }
+
+  range.setFormula(formula);
+  return { skipped: false };
+}
+
+/**
+ * format_cell — Apply formatting to a cell.
+ * Expected fields: { type, sheet, cell, format }
+ * Supported format properties:
+ *   fontColor, background/backgroundColor, bold, italic, fontSize, numberFormat
+ */
+function _execFormatCell(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var range = sheet.getRange(action.cell);
+  var fmt = action.format;
+
+  if (!fmt || typeof fmt !== 'object') {
+    throw new Error('format_cell requires a format object');
+  }
+
+  // Font color
+  if (fmt.fontColor) {
+    range.setFontColor(fmt.fontColor);
+  }
+
+  // Background color (accept both 'background' and 'backgroundColor')
+  var bgColor = fmt.background || fmt.backgroundColor;
+  if (bgColor) {
+    range.setBackground(bgColor);
+  }
+
+  // Bold
+  if (fmt.bold !== undefined) {
+    range.setFontWeight(fmt.bold ? 'bold' : 'normal');
+  }
+
+  // Italic
+  if (fmt.italic !== undefined) {
+    range.setFontStyle(fmt.italic ? 'italic' : 'normal');
+  }
+
+  // Font size
+  if (fmt.fontSize !== undefined) {
+    range.setFontSize(fmt.fontSize);
+  }
+
+  // Number format (e.g., "#,##0.00", "$#,##0", "0.0%")
+  if (fmt.numberFormat) {
+    range.setNumberFormat(fmt.numberFormat);
+  }
+
+  return { skipped: false };
+}
+
+/**
+ * add_sheet — Create a new sheet. Skips if a sheet with the name already exists.
+ * Expected fields: { type, sheetName }
+ */
+function _execAddSheet(ss, action) {
+  var name = action.sheetName;
+  if (!name) {
+    throw new Error('add_sheet requires sheetName');
+  }
+
+  // Check if sheet already exists
+  var existing = ss.getSheetByName(name);
+  if (existing) {
+    return { skipped: true, reason: 'Sheet "' + name + '" already exists' };
+  }
+
+  ss.insertSheet(name);
+  return { skipped: false };
+}
+
+/**
+ * rename_sheet — Rename an existing sheet.
+ * Expected fields: { type, sheet (current name), sheetName (new name) }
+ */
+function _execRenameSheet(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var newName = action.sheetName;
+
+  if (!newName) {
+    throw new Error('rename_sheet requires sheetName (new name)');
+  }
+
+  // Check if target name is already taken
+  var conflict = ss.getSheetByName(newName);
+  if (conflict) {
+    return { skipped: true, reason: 'Cannot rename: sheet "' + newName + '" already exists' };
+  }
+
+  sheet.setName(newName);
+  return { skipped: false };
+}
+
+/**
+ * add_named_range — Create a named range.
+ * Expected fields: { type, rangeName, rangeA1 }
+ * rangeA1 can include sheet reference: "Assumptions!B5" or "Assumptions!B5:B10"
+ */
+function _execAddNamedRange(ss, action) {
+  var name = action.rangeName;
+  var a1 = action.rangeA1;
+
+  if (!name || !a1) {
+    throw new Error('add_named_range requires rangeName and rangeA1');
+  }
+
+  // Parse rangeA1 — may include sheet name (e.g., "Assumptions!B5")
+  var range;
+  if (a1.indexOf('!') !== -1) {
+    var parts = a1.split('!');
+    var sheetName = parts[0].replace(/'/g, ''); // Strip quotes around sheet names
+    var cellRef = parts[1];
+    var sheet = _getSheet(ss, sheetName);
+    range = sheet.getRange(cellRef);
+  } else {
+    // Default to active sheet
+    range = ss.getActiveSheet().getRange(a1);
+  }
+
+  // Remove existing named range with the same name (if any) to avoid duplicates
+  var existing = ss.getNamedRanges();
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].getName() === name) {
+      existing[i].remove();
+      break;
+    }
+  }
+
+  ss.setNamedRange(name, range);
+  return { skipped: false };
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Get a sheet by name, with a clear error if it doesn't exist.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {string} sheetName
+ * @return {GoogleAppsScript.Spreadsheet.Sheet}
+ */
+function _getSheet(ss, sheetName) {
+  if (!sheetName) {
+    throw new Error('Sheet name is required but was not provided');
+  }
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    throw new Error('Sheet "' + sheetName + '" not found in workbook');
+  }
+
+  return sheet;
+}
+
+/**
+ * Build a human-readable description of an action for logging and UI previews.
+ *
+ * @param {Object} action - A CellAction object.
+ * @return {string} Short description.
+ */
+function _describeAction(action) {
+  switch (action.type) {
+    case 'set_value':
+      var displayVal = _truncate(String(action.value), 30);
+      return 'Set ' + action.cell + ' = "' + displayVal + '" on ' + action.sheet;
+
+    case 'set_formula':
+      var displayFormula = _truncate(action.formula, 40);
+      return 'Set ' + action.cell + ' = ' + displayFormula + ' on ' + action.sheet;
+
+    case 'format_cell':
+      var fmtParts = [];
+      var fmt = action.format || {};
+      if (fmt.fontColor) fmtParts.push('color: ' + fmt.fontColor);
+      if (fmt.bold) fmtParts.push('bold');
+      if (fmt.italic) fmtParts.push('italic');
+      if (fmt.numberFormat) fmtParts.push('format: ' + fmt.numberFormat);
+      if (fmt.background || fmt.backgroundColor) fmtParts.push('bg: ' + (fmt.background || fmt.backgroundColor));
+      if (fmt.fontSize) fmtParts.push('size: ' + fmt.fontSize);
+      return 'Format ' + action.cell + ' on ' + action.sheet + ' (' + fmtParts.join(', ') + ')';
+
+    case 'add_sheet':
+      return 'Add sheet "' + action.sheetName + '"';
+
+    case 'rename_sheet':
+      return 'Rename sheet "' + action.sheet + '" → "' + action.sheetName + '"';
+
+    case 'add_named_range':
+      return 'Named range "' + action.rangeName + '" → ' + action.rangeA1;
+
+    default:
+      return action.type + ' (unknown)';
+  }
+}
+
+/**
+ * Describe an action array for the sidebar preview.
+ * Returns an array of human-readable strings.
+ *
+ * @param {Array} actions - Array of CellAction objects.
+ * @return {Array} Array of description strings.
+ */
+function describeActions(actions) {
+  if (!actions || !Array.isArray(actions)) return [];
+  var descriptions = [];
+  for (var i = 0; i < actions.length; i++) {
+    descriptions.push(_describeAction(actions[i]));
+  }
+  return descriptions;
+}
+
+/**
+ * Truncate a string to a max length, adding "…" if truncated.
+ *
+ * @param {string} str
+ * @param {number} maxLen
+ * @return {string}
+ */
+function _truncate(str, maxLen) {
+  if (!str) return '';
+  if (str.length <= maxLen) return str;
+  return str.substring(0, maxLen - 1) + '…';
+}

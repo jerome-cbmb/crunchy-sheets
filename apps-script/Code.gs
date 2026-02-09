@@ -96,12 +96,30 @@ function analyzeWorkbook(userPrompt) {
   var result = JSON.parse(response.getContentText());
 
   if (result.actions && result.actions.length > 0) {
-    // TODO: Apply cell actions (writes, formatting) with confirmation
-    Logger.log('Actions received: ' + result.actions.length);
+    // Actions are returned to the sidebar for user confirmation before applying.
+    // The sidebar will call applyActions() after the user clicks "Apply All".
+    Logger.log('Actions received: ' + result.actions.length + ' — awaiting user confirmation in sidebar');
   }
 
   return result;
 }
+
+// ─── Action Execution ────────────────────────────────────────────────────────
+
+/**
+ * Apply a set of CellActions to the active spreadsheet.
+ * Called from the sidebar after user confirms via the "Apply All" button.
+ * Delegates to executeActions() in ActionExecutor.gs.
+ *
+ * @param {Array} actions - Array of CellAction objects.
+ * @return {Object} Result: { applied: number, skipped: number, errors: string[] }
+ */
+function applyActions(actions) {
+  Logger.log('[Code] applyActions called with ' + (actions ? actions.length : 0) + ' actions');
+  return executeActions(actions);
+}
+
+// ─── Health Check ────────────────────────────────────────────────────────────
 
 /**
  * Quick health check — calls the backend with a special skill.

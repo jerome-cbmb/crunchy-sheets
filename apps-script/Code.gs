@@ -62,6 +62,51 @@ function showAbout() {
   );
 }
 
+// ─── Web App ────────────────────────────────────────────────────────────────
+
+/**
+ * Web app entry point. Serves Sidebar.html as a standalone page
+ * so the ↗ button can open a real browser window via window.open().
+ */
+function doGet(e) {
+  return HtmlService.createHtmlOutputFromFile('Sidebar')
+    .setTitle('Crunchy Sheets')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Returns the deployed web app URL for pre-fetching in the sidebar.
+ * @return {string} The web app URL.
+ */
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
+}
+
+/**
+ * Returns the name of the currently active sheet.
+ * Called before opening the web app window so the correct sheet context is preserved.
+ * @return {string} Active sheet name.
+ */
+function getActiveSheetName() {
+  return SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getName();
+}
+
+/**
+ * Save the active sheet override to UserProperties (for web app mode).
+ * @param {string} name - Sheet name to persist, or empty string to clear.
+ */
+function saveActiveSheetOverride(name) {
+  PropertiesService.getUserProperties().setProperty('activeSheetOverride', name || '');
+}
+
+/**
+ * Load the active sheet override from UserProperties.
+ * @return {string|null} Sheet name, or null if not set.
+ */
+function loadActiveSheetOverride() {
+  return PropertiesService.getUserProperties().getProperty('activeSheetOverride') || null;
+}
+
 // ─── Backend Communication ───────────────────────────────────────────────────
 
 /**
@@ -126,8 +171,8 @@ function analyzeWorkbook(userPrompt) {
  * @param {string} userPrompt - The user's question or instruction.
  * @return {Object} Payload for the Vercel /analyze endpoint.
  */
-function getAnalyzePayload(userPrompt) {
-  var state = serializeWorkbookState();
+function getAnalyzePayload(userPrompt, activeSheetOverride) {
+  var state = serializeWorkbookState(activeSheetOverride || null);
   var token = ScriptApp.getOAuthToken();
   var userRole = getUserRole();
 

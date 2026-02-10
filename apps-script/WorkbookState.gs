@@ -18,9 +18,11 @@
  *
  * @return {Object} Complete workbook state.
  */
-function serializeWorkbookState() {
+function serializeWorkbookState(activeSheetOverride) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var activeSheet = ss.getActiveSheet();
+  var activeSheet = activeSheetOverride
+    ? (ss.getSheetByName(activeSheetOverride) || ss.getActiveSheet())
+    : ss.getActiveSheet();
   var sheets = ss.getSheets();
 
   var state = {

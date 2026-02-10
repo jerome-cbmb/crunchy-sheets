@@ -609,7 +609,7 @@
   <div class="header">
     <div class="header-row">
       <h1>🥜 Crunchy Sheets</h1>
-      <button class="expand-btn" onclick="expandView()" title="Open expanded view">↗</button>
+      <button class="expand-btn" onclick="toggleView()" title="Open in window">↗</button>
     </div>
     <div class="subtitle">AI CFO for Google Sheets</div>
   </div>
@@ -651,9 +651,23 @@
     // ─── State ──────────────────────────────────────────────────────────
     var selectedSkill = null;
     var pendingActions = null; // Actions awaiting user confirmation
+    var webAppUrl = null;
+    var isWebAppMode = (window.top === window.self);
+    var activeSheetOverride = null;
 
     // ─── Init ───────────────────────────────────────────────────────────
     (function init() {
+      // Web app mode: change expand button to collapse
+      if (isWebAppMode) {
+        var btn = document.querySelector('.expand-btn');
+        if (btn) { btn.textContent = '←'; btn.title = 'Close window'; }
+      } else {
+        // Sidebar mode: pre-fetch web app URL for popup-blocker avoidance
+        google.script.run
+          .withSuccessHandler(function(url) { webAppUrl = url; })
+          .getWebAppUrl();
+      }
+
       // Load user info
       google.script.run
         .withSuccessHandler(function(status) {
@@ -697,6 +711,19 @@
 
       // Restore chat state if returning from expanded view
       restoreChatState();
+
+      // Web app mode: load active sheet override from UserProperties
+      if (isWebAppMode) {
+        google.script.run
+          .withSuccessHandler(function(name) {
+            if (name) {
+              activeSheetOverride = name;
+              // Clear the override so it doesn't persist to future sessions
+              google.script.run.saveActiveSheetOverride('');
+            }
+          })
+          .loadActiveSheetOverride();
+      }
     })();
 
     // ─── Chat ───────────────────────────────────────────────────────────
@@ -731,7 +758,7 @@
           setLoading(false);
           addMessage('⚠ Error preparing request: ' + err.message, 'system');
         })
-        .getAnalyzePayload(fullPrompt);
+        .getAnalyzePayload(fullPrompt, activeSheetOverride || undefined);
     }
 
     // ─── Streaming ───────────────────────────────────────────────────────
@@ -1427,20 +1454,39 @@
       return div.innerHTML;
     }
 
-    // ─── Expand View ──────────────────────────────────────────────────────
+    // ─── Window Toggle ────────────────────────────────────────────────────
 
     /**
-     * Save chat state and open expanded dialog.
+     * Toggle between sidebar and standalone browser window.
+     * Expand: opens a real Chrome window via the deployed web app URL.
+     * Collapse: saves chat state and closes the window.
      */
-    function expandView() {
-      saveChatState(function() {
-        google.script.run.openExpandedView();
-        google.script.host.close();
-      });
+    function toggleView() {
+      if (isWebAppMode) {
+        // Collapse: save state, close window
+        saveChatState(function() { window.close(); });
+      } else {
+        // Expand: open real browser window
+        if (!webAppUrl) {
+          addMessage('Web app URL not ready. Try again in a moment.', 'system');
+          return;
+        }
+        // Step 1: open window synchronously (popup-blocker safe)
+        window.open(webAppUrl, 'crunchySheets', 'width=700,height=750,resizable=yes');
+        // Step 2: save sheet context + chat state async, then close sidebar
+        google.script.run
+          .withSuccessHandler(function(sheetName) {
+            google.script.run.saveActiveSheetOverride(sheetName);
+            saveChatState(function() { google.script.host.close(); });
+          })
+          .getActiveSheetName();
+      }
     }
 
     /**
      * Serialize visible chat messages to UserProperties for state transfer.
+     * Truncation guard: UserProperties has a 9KB per-property limit.
+     * Drops oldest messages until under 8KB (leaves headroom).
      */
     function saveChatState(onDone) {
       var container = document.getElementById('messages');
@@ -1449,9 +1495,15 @@
       for (var i = 0; i < children.length; i++) {
         state.push(children[i].outerHTML);
       }
+      // Truncation guard: drop oldest messages until under 8KB
+      var json = JSON.stringify(state);
+      while (json.length > 8000 && state.length > 1) {
+        state.shift();
+        json = JSON.stringify(state);
+      }
       var runner = google.script.run;
       if (onDone) runner = runner.withSuccessHandler(onDone);
-      runner.saveChatHistory(JSON.stringify(state));
+      runner.saveChatHistory(json);
     }
 
     /**

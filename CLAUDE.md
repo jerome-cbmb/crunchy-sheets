@@ -5,25 +5,30 @@ AI CFO for Google Sheets. Understands workbook structure, thinks like a financia
 ## Architecture
 
 ```
-Sidebar (HTML/JS)  →  Apps Script (.gs)  →  Cloud Function /analyze  →  Claude API
-                                                                          ↓
-                                                    structured JSON { actions[], response }
-                                                                          ↓
-Sidebar preview  ←  Apps Script applyActions()  ←  action-parser validates  ←
+Sidebar (HTML/JS)  ──fetch()──→  Vercel /api/analyze  →  Claude API (streaming)
+                                                              ↓
+                                              streamed JSON { actions[], response }
+                                                              ↓
+Sidebar preview  ←──────── ReadableStream chunks ──────────── ←
+
+User clicks "Apply All" → google.script.run.applyActions(actions)
+                             → ActionExecutor.gs writes to spreadsheet
 ```
+
+The sidebar calls Vercel directly via `fetch()` with streaming (`ReadableStream`). Apps Script handles workbook serialization, auth token retrieval, and action execution — but the AI call bypasses Apps Script entirely.
 
 **RLM (Runtime Language Model):** The workbook is serialized into a single JSON state string on every request using **tiered serialization**: the active sheet gets full cell data, other sheets get headers + bookend rows (first 3 + last 3, capped at 8 columns). No RAG, no chunking, no repeated lookups. Claude reasons over full active sheet + structural summaries of all other tabs.
 
 ## Data Flow (happy path)
 
 1. First open: onboarding card asks user role (builder/reviewer/inherited/exploring) → saved to `UserProperties`
-2. User types in sidebar → `send()` calls `google.script.run.analyzeWorkbook(prompt)`
-3. `Code.gs:analyzeWorkbook()` calls `serializeWorkbookState()` + reads `userRole` from UserProperties
-4. Serialized state + prompt + userRole + Bearer token sent via `UrlFetchApp.fetch()` to Cloud Function `/analyze`
-5. `analyze.ts:handleAnalyze()` verifies Google OAuth token, routes to skill, builds user message with role context, calls Claude
-6. Claude returns JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` for X-Ray skill)
-7. `action-parser.ts:parseClaudeResponse()` extracts and validates the JSON block. Formula X-Ray responses short-circuit with `formulaXray` passthrough (no action validation)
-8. Result returned to sidebar → assistant response rendered as markdown + actions preview panel. Formula X-Ray renders a color-coded breakdown card instead
+2. User types in sidebar → `send()` calls `google.script.run.getAnalysisPayload(prompt)` to get serialized state + token
+3. Sidebar calls `fetch(VERCEL_API_BASE + '/api/analyze', ...)` directly with streaming
+4. `route.ts` verifies Google OAuth token, routes to skill, builds system prompt with role context, calls Claude via streaming API
+5. Claude streams JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` for X-Ray skill)
+6. Sidebar renders response progressively as chunks arrive via `ReadableStream`
+7. On stream complete: action-parser extracts and validates JSON block. Formula X-Ray responses short-circuit with passthrough (no action validation)
+8. Assistant response rendered as markdown + actions preview panel. Formula X-Ray renders a color-coded breakdown card instead
 9. User clicks "Apply All" → `google.script.run.applyActions(actions)` (X-Ray is read-only, no actions)
 10. `ActionExecutor.gs:executeActions()` applies each action to the spreadsheet
 
@@ -31,30 +36,46 @@ Sidebar preview  ←  Apps Script applyActions()  ←  action-parser validates  
 
 ```
 crunchy-sheets/
-├── apps-script/              # Google Apps Script add-on (deployed via clasp)
-│   ├── Code.gs               # Menu, sidebar launcher, analyzeWorkbook(), applyActions(), expanded view, user role persistence
-│   ├── Sidebar.html          # Chat UI, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, expand-to-dialog
-│   ├── WorkbookState.gs      # Workbook → JSON serializer (RLM core)
-│   ├── ActionExecutor.gs     # Applies CellAction[] to the spreadsheet
-│   ├── OAuth.gs              # getAuthToken(), checkAuthStatus(), registerUser()
-│   ├── Skills.gs             # 11 financial skills registry (sidebar dropdown source)
-│   ├── appsscript.json       # Manifest (V8 runtime, America/New_York)
-│   └── .clasp.json           # Bound to test spreadsheet (parentId: 1hzhET6...)
+├── app/                          # Next.js API routes (Vercel serverless)
+│   └── api/
+│       ├── analyze/route.ts      # Streaming Claude call: auth → skill route → stream → parse
+│       └── auth/route.ts         # Google OAuth token verification endpoint
 │
-├── cloud-functions/          # GCP Cloud Functions backend (TypeScript)
+├── lib/                          # Shared TypeScript modules
+│   ├── types.ts                  # CellAction, SkillDefinition, AnalyzeRequest/Response
+│   ├── skill-router.ts           # 11 skill definitions with keywords, instructions, model tiers
+│   ├── action-parser.ts          # Extracts JSON from Claude response, validates actions; formula_xray passthrough
+│   ├── system-prompt.ts          # Builds system prompt with temporal awareness + user role context
+│   ├── auth.ts                   # Google OAuth token verification, Supabase user upsert
+│   └── usage.ts                  # Token usage tracking to Supabase
+│
+├── apps-script/                  # Google Apps Script add-on (deployed via clasp)
+│   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(), applyActions(), doGet() web app, active sheet override, user role persistence
+│   ├── Sidebar.html              # Chat UI, streaming fetch, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, window toggle (sidebar ↔ browser window)
+│   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core)
+│   ├── ActionExecutor.gs         # Applies CellAction[] to the spreadsheet
+│   ├── OAuth.gs                  # getAuthToken(), checkAuthStatus(), registerUser()
+│   ├── Skills.gs                 # 11 financial skills registry (sidebar dropdown source)
+│   ├── appsscript.json           # Manifest (V8 runtime, America/New_York)
+│   └── .clasp.json               # Bound to test spreadsheet (parentId: 1hzhET6...)
+│
+├── cloud-functions/              # GCP Cloud Functions backend (legacy, non-streaming)
 │   ├── src/
-│   │   ├── index.ts          # HTTP entry points: /analyze and /auth (CORS, routing)
-│   │   ├── analyze.ts        # Core handler: auth → skill route → Claude call (with temporal awareness + user role context) → parse → track usage
-│   │   ├── skill-router.ts   # 11 skill definitions with keywords, instructions, model tiers
-│   │   ├── action-parser.ts  # Extracts JSON from Claude response, validates each action; formula_xray passthrough
-│   │   └── auth.ts           # Google OAuth token verification, Supabase user upsert
+│   │   ├── index.ts              # HTTP entry points: /analyze and /auth (CORS, routing)
+│   │   ├── analyze.ts            # Core handler: auth → skill route → Claude call → parse → track usage
+│   │   ├── skill-router.ts       # 11 skill definitions with keywords, instructions, model tiers
+│   │   ├── action-parser.ts      # Extracts JSON from Claude response, validates each action
+│   │   └── auth.ts               # Google OAuth token verification, Supabase user upsert
 │   ├── package.json
-│   └── tsconfig.json         # Strict, ES2022, commonjs output to dist/
+│   └── tsconfig.json
 │
 ├── supabase/
 │   └── migrations/
-│       └── 001_create_tables.sql  # users, sessions, usage tables + usage_monthly view
+│       └── 001_create_tables.sql # users, sessions, usage tables + usage_monthly view
 │
+├── next.config.ts                # Next.js config (minimal)
+├── package.json                  # Next.js + Anthropic SDK dependencies
+├── tsconfig.json                 # Strict, ES2022
 └── README.md
 ```
 
@@ -114,21 +135,24 @@ clasp open          # Open in Apps Script editor
 clasp login         # Authenticate (first time)
 ```
 
-### Cloud Functions
+### Vercel Backend (primary)
+
+```bash
+npm install         # Install dependencies
+npm run build       # next build
+npm run dev         # Local dev server on :3000
+vercel --prod       # Deploy to production
+vercel env ls       # List environment variables
+```
+
+### Cloud Functions (legacy)
 
 ```bash
 cd cloud-functions
 npm install         # Install dependencies
 npm run build       # tsc → dist/
-npm run watch       # tsc --watch
-npm run serve       # Build + local server on :8080 (functions-framework)
 npm run deploy      # Build + deploy both /analyze and /auth to GCP
 ```
-
-Deploy scripts read secrets from `~/.config/secrets/` at deploy time:
-- `npm run deploy:analyze` — deploys the /analyze function
-- `npm run deploy:auth` — deploys the /auth function
-- `npm run deploy` — builds + deploys both
 
 ### Supabase
 
@@ -137,7 +161,9 @@ Deploy scripts read secrets from `~/.config/secrets/` at deploy time:
 supabase db push --db-url "postgresql://postgres:[PASSWORD]@db.diselpdcsgjgetgmixhc.supabase.co:5432/postgres"
 ```
 
-## Environment Variables (Cloud Functions)
+## Environment Variables
+
+### Vercel (primary — set via `vercel env add`)
 
 | Variable | Value / Source |
 |----------|---------------|
@@ -145,19 +171,24 @@ supabase db push --db-url "postgresql://postgres:[PASSWORD]@db.diselpdcsgjgetgmi
 | `SUPABASE_URL` | `https://diselpdcsgjgetgmixhc.supabase.co` |
 | `SUPABASE_SERVICE_KEY` | `~/.config/secrets/supabase-crunchy-sheets-service-key` |
 
-Set automatically during `npm run deploy` via `--set-env-vars` flags.
+Local dev uses `.env.local` with the same keys.
 
-## GCP & Supabase Details
+### Cloud Functions (legacy — set via `--set-env-vars` at deploy)
+
+Same three variables, injected from `~/.config/secrets/` during `npm run deploy`.
+
+## Infrastructure
 
 | Setting | Value |
 |---------|-------|
+| **Vercel Project** | `brklyngg/crunchy-sheets` |
+| **Production URL** | `https://crunchy-sheets.vercel.app` |
+| **Sidebar VERCEL_API_BASE** | `https://crunchy-sheets.vercel.app` |
 | GCP Project ID | `crunchy-sheets` |
-| GCP Project Number | `930082478249` |
 | GCP Region | `us-central1` |
-| Cloud Functions Runtime | Node.js 20 |
+| Cloud Function Base URL | `https://us-central1-crunchy-sheets.cloudfunctions.net` |
 | Supabase Ref | `diselpdcsgjgetgmixhc` |
 | Supabase Region | `us-west-2` |
-| Cloud Function Base URL | `https://us-central1-crunchy-sheets.cloudfunctions.net` |
 
 ## Apps Script Binding
 
@@ -178,12 +209,13 @@ RLS enabled on all tables, service role bypasses.
 ## Auth Flow
 
 1. Apps Script calls `ScriptApp.getOAuthToken()` (Google access token)
-2. Sent as `Bearer` header with every request to Cloud Functions
-3. Cloud Function calls Google's `/oauth2/v3/userinfo` to verify
+2. Sent as `Bearer` header with every `fetch()` to Vercel
+3. Vercel `/api/analyze` calls Google's `/oauth2/v3/userinfo` to verify
 4. User upserted into Supabase `users` table on first request
 
 ## Key Design Decisions
 
+- **Streaming via Vercel:** Sidebar calls Vercel directly via `fetch()` + `ReadableStream`. Response renders progressively — no waiting for full completion. Apps Script is bypassed for the AI call (only used for workbook serialization and action execution).
 - **Tiered serialization:** Active sheet = full cell data. Other sheets = headers + 3+3 bookend rows, capped at 8 columns. Hidden sheets skipped. Target: ~25-40K tokens for an 8-tab SaaS model. Token guard at 150K rejects oversized payloads before calling Claude.
 - **No RAG:** Single JSON state per request. Simpler, more accurate than chunking.
 - **Actions require confirmation:** Claude returns proposed actions → sidebar shows preview → user clicks "Apply All" before anything touches the spreadsheet.
@@ -191,7 +223,7 @@ RLS enabled on all tables, service role bypasses.
 - **Model selection per skill:** Opus for complex reasoning (cash flow, unit economics, cohorts, scenarios). Sonnet for fast analysis (variance, BvA, dashboard, categorization).
 - **Sheet type classification:** WorkbookState.gs auto-classifies tabs (assumptions, income_statement, balance_sheet, etc.) from name + header row patterns.
 - **Concise responses:** System prompt enforces sidebar-friendly brevity — short sentences, bullet points, no filler.
-- **Temporal awareness:** System prompt includes today's date (evaluated at cold-start). Claude says "most recent actuals (through [period])" instead of "current state ([period])". Notes stale data (>6 months old).
+- **Temporal awareness:** System prompt includes today's date. Claude says "most recent actuals (through [period])" instead of "current state ([period])". Notes stale data (>6 months old).
 - **Neutral language:** System prompt instructs "this model shows..." not "your forecast...". User role (if set) adjusts tone — builder gets technical directness, reviewer gets risk flags, inherited gets structural explanations.
-- **Onboarding:** First-use card asks user role (builder/reviewer/inherited/exploring). Saved to `UserProperties`, sent as `userRole` in every `/analyze` request. Role persists across sessions.
-- **Expandable view:** ↗ button in sidebar header saves chat state to `UserProperties` and opens Sidebar.html as a 600x700 modeless dialog. State auto-clears after restore to prevent stale replays. 9KB UserProperties limit is acceptable for MVP.
+- **Onboarding:** First-use card asks user role (builder/reviewer/inherited/exploring). Saved to `UserProperties`, sent as `userRole` in every request. Role persists across sessions.
+- **Separate browser window:** ↗ button opens a real Chrome window via `window.open()` to the deployed web app URL (`doGet()` serves Sidebar.html). Chat state and active sheet context transfer via `UserProperties`. `isWebAppMode` detection (`window.top === window.self`) swaps the button to ← for closing. `saveChatState()` truncates to 8KB to stay within UserProperties limits.

@@ -145,7 +145,7 @@ export async function handleAnalyze(req: Request): Promise<AnalyzeResponse> {
 
   // 4. Select model based on skill tier
   const model = skillContext.modelTier === 'opus'
-    ? 'claude-opus-4-6-20250205'
+    ? 'claude-opus-4-6'
     : 'claude-sonnet-4-5-20250929';
 
   // 5. Call Claude

@@ -16,23 +16,24 @@ Sidebar preview  ←  Apps Script applyActions()  ←  action-parser validates  
 
 ## Data Flow (happy path)
 
-1. User types in sidebar → `send()` calls `google.script.run.analyzeWorkbook(prompt)`
-2. `Code.gs:analyzeWorkbook()` calls `serializeWorkbookState()` (WorkbookState.gs)
-3. Serialized state + prompt + Bearer token sent via `UrlFetchApp.fetch()` to Cloud Function `/analyze`
-4. `analyze.ts:handleAnalyze()` verifies Google OAuth token, routes to skill, calls Claude
-5. Claude returns JSON with `actions[]`, `response`, `summary`
-6. `action-parser.ts:parseClaudeResponse()` extracts and validates the JSON block
-7. Result returned to sidebar → shows AI response + actions preview panel
-8. User clicks "Apply All" → `google.script.run.applyActions(actions)`
-9. `ActionExecutor.gs:executeActions()` applies each action to the spreadsheet
+1. First open: onboarding card asks user role (builder/reviewer/inherited/exploring) → saved to `UserProperties`
+2. User types in sidebar → `send()` calls `google.script.run.analyzeWorkbook(prompt)`
+3. `Code.gs:analyzeWorkbook()` calls `serializeWorkbookState()` + reads `userRole` from UserProperties
+4. Serialized state + prompt + userRole + Bearer token sent via `UrlFetchApp.fetch()` to Cloud Function `/analyze`
+5. `analyze.ts:handleAnalyze()` verifies Google OAuth token, routes to skill, builds user message with role context, calls Claude
+6. Claude returns JSON with `actions[]`, `response`, `summary`
+7. `action-parser.ts:parseClaudeResponse()` extracts and validates the JSON block
+8. Result returned to sidebar → assistant response rendered as markdown (bold, bullets, cell-ref styling) + actions preview panel
+9. User clicks "Apply All" → `google.script.run.applyActions(actions)`
+10. `ActionExecutor.gs:executeActions()` applies each action to the spreadsheet
 
 ## Project Structure
 
 ```
 crunchy-sheets/
 ├── apps-script/              # Google Apps Script add-on (deployed via clasp)
-│   ├── Code.gs               # Menu, sidebar launcher, analyzeWorkbook(), applyActions()
-│   ├── Sidebar.html          # Chat UI, skill chips, action preview/apply, results panel
+│   ├── Code.gs               # Menu, sidebar launcher, analyzeWorkbook(), applyActions(), expanded view, user role persistence
+│   ├── Sidebar.html          # Chat UI, markdown rendering, skill chips, action preview/apply, onboarding, expand-to-dialog
 │   ├── WorkbookState.gs      # Workbook → JSON serializer (RLM core)
 │   ├── ActionExecutor.gs     # Applies CellAction[] to the spreadsheet
 │   ├── OAuth.gs              # getAuthToken(), checkAuthStatus(), registerUser()
@@ -43,7 +44,7 @@ crunchy-sheets/
 ├── cloud-functions/          # GCP Cloud Functions backend (TypeScript)
 │   ├── src/
 │   │   ├── index.ts          # HTTP entry points: /analyze and /auth (CORS, routing)
-│   │   ├── analyze.ts        # Core handler: auth → skill route → Claude call → parse → track usage
+│   │   ├── analyze.ts        # Core handler: auth → skill route → Claude call (with temporal awareness + user role context) → parse → track usage
 │   │   ├── skill-router.ts   # 10 skill definitions with keywords, instructions, model tiers
 │   │   ├── action-parser.ts  # Extracts JSON from Claude response, validates each action
 │   │   └── auth.ts           # Google OAuth token verification, Supabase user upsert
@@ -189,3 +190,7 @@ RLS enabled on all tables, service role bypasses.
 - **Model selection per skill:** Opus for complex reasoning (cash flow, unit economics, cohorts, scenarios). Sonnet for fast analysis (variance, BvA, dashboard, categorization).
 - **Sheet type classification:** WorkbookState.gs auto-classifies tabs (assumptions, income_statement, balance_sheet, etc.) from name + header row patterns.
 - **Concise responses:** System prompt enforces sidebar-friendly brevity — short sentences, bullet points, no filler.
+- **Temporal awareness:** System prompt includes today's date (evaluated at cold-start). Claude says "most recent actuals (through [period])" instead of "current state ([period])". Notes stale data (>6 months old).
+- **Neutral language:** System prompt instructs "this model shows..." not "your forecast...". User role (if set) adjusts tone — builder gets technical directness, reviewer gets risk flags, inherited gets structural explanations.
+- **Onboarding:** First-use card asks user role (builder/reviewer/inherited/exploring). Saved to `UserProperties`, sent as `userRole` in every `/analyze` request. Role persists across sessions.
+- **Expandable view:** ↗ button in sidebar header saves chat state to `UserProperties` and opens Sidebar.html as a 600x700 modeless dialog. State auto-clears after restore to prevent stale replays. 9KB UserProperties limit is acceptable for MVP.

@@ -60,6 +60,21 @@ COMMUNICATION STYLE:
 - No filler phrases ("I'd be happy to", "Great question", "Let me help you with that").
 - Be direct, opinionated, and finance-flavored.
 
+TEMPORAL AWARENESS:
+Today's date is ${new Date().toISOString().split('T')[0]}.
+- When referencing time periods in the workbook, say "most recent actuals (through [period])" not "current state ([period])".
+- If the most recent data is more than 6 months old relative to today, note it: "Note: the most recent data is from [period], which is [N] months ago."
+- Never assume data represents "the present" — it represents the most recent reporting period.
+
+USER CONTEXT:
+- Refer to the workbook neutrally: "this model shows..." not "your forecast..."
+- Don't assume the user created the workbook. They may be reviewing, auditing, or inheriting it.
+- If a user role is provided, adjust your tone:
+  - Builder: direct, technical, assume familiarity with the model
+  - Reviewer: focus on risks, inconsistencies, and flags
+  - Inherited: help them understand structure and assumptions
+  - Exploring: be descriptive, explain what each tab does
+
 ${buildActionInstructions()}`;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -70,6 +85,7 @@ interface AnalyzeRequest {
   skill?: string;
   spreadsheetId: string;
   userEmail: string;
+  userRole?: string;
 }
 
 export interface CellAction {
@@ -125,7 +141,7 @@ export async function handleAnalyze(req: Request): Promise<AnalyzeResponse> {
     throw new Error(`Workbook context too large (~${Math.round(estimatedTokens / 1000)}K tokens). Try switching to a smaller tab and resending.`);
   }
 
-  const userMessage = buildUserMessage(body.prompt, workbookStateStr, skillContext);
+  const userMessage = buildUserMessage(body.prompt, workbookStateStr, skillContext, body.userRole);
 
   // 4. Select model based on skill tier
   const model = skillContext.modelTier === 'opus'
@@ -170,8 +186,18 @@ export async function handleAnalyze(req: Request): Promise<AnalyzeResponse> {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function buildUserMessage(prompt: string, workbookState: string, skill: SkillContext): string {
+function buildUserMessage(prompt: string, workbookState: string, skill: SkillContext, userRole?: string): string {
   let msg = '';
+
+  if (userRole) {
+    const roleDescriptions: Record<string, string> = {
+      builder: 'The user built or maintains this model. Be direct and technical.',
+      reviewer: 'The user is reviewing or auditing this model. Focus on risks and flags.',
+      inherited: 'The user inherited this model from someone else. Help them understand it.',
+      exploring: 'The user is exploring this model. Be descriptive about structure and purpose.',
+    };
+    msg += `[User Role: ${userRole}] ${roleDescriptions[userRole] || ''}\n\n`;
+  }
 
   if (skill.skillId) {
     msg += `[Active Skill: ${skill.skillId}]\n${skill.instruction}\n\n`;

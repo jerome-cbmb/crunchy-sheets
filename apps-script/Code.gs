@@ -75,11 +75,14 @@ function analyzeWorkbook(userPrompt) {
   var state = serializeWorkbookState();
   var token = ScriptApp.getOAuthToken();
 
+  var userRole = getUserRole();
+
   var payload = {
     workbookState: state,
     prompt: userPrompt,
     spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
-    userEmail: Session.getActiveUser().getEmail()
+    userEmail: Session.getActiveUser().getEmail(),
+    userRole: userRole || undefined
   };
 
   var options = {
@@ -169,4 +172,52 @@ function runHealthCheck() {
   }
 
   SpreadsheetApp.getUi().alert('Health Check', result.summary || result.error || 'Complete.', SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+// ─── Expanded View ──────────────────────────────────────────────────────────
+
+/**
+ * Opens the sidebar content in a larger modeless dialog.
+ */
+function openExpandedView() {
+  var html = HtmlService.createHtmlOutputFromFile('Sidebar')
+    .setWidth(600)
+    .setHeight(700);
+  SpreadsheetApp.getUi().showModelessDialog(html, 'Crunchy Sheets');
+}
+
+// ─── Chat History Persistence ───────────────────────────────────────────────
+
+/**
+ * Save chat history to UserProperties for state transfer between sidebar/dialog.
+ * @param {string} stateJson - JSON string of chat messages.
+ */
+function saveChatHistory(stateJson) {
+  PropertiesService.getUserProperties().setProperty('chatHistory', stateJson);
+}
+
+/**
+ * Load chat history from UserProperties.
+ * @return {string|null} JSON string of chat messages, or null.
+ */
+function loadChatHistory() {
+  return PropertiesService.getUserProperties().getProperty('chatHistory');
+}
+
+// ─── User Role ──────────────────────────────────────────────────────────────
+
+/**
+ * Save the user's selected role (builder, reviewer, inherited, exploring).
+ * @param {string} role - The selected role.
+ */
+function saveUserRole(role) {
+  PropertiesService.getUserProperties().setProperty('userRole', role);
+}
+
+/**
+ * Get the user's previously selected role.
+ * @return {string|null} The role, or null if not set.
+ */
+function getUserRole() {
+  return PropertiesService.getUserProperties().getProperty('userRole');
 }

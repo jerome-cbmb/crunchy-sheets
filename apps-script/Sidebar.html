@@ -335,17 +335,124 @@
       border-top-color: #1e8e3e;
     }
 
+    /* ─── Header flex row + expand button ────────────────── */
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .expand-btn {
+      background: none;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 2px 8px;
+      color: #5f6368;
+      transition: all 0.15s;
+      line-height: 1;
+    }
+
+    .expand-btn:hover {
+      border-color: #1a73e8;
+      color: #1a73e8;
+    }
+
+    /* ─── Markdown rendering in assistant messages ────────── */
+    .message.assistant p { margin: 4px 0; }
+    .message.assistant h3 { font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
+    .message.assistant ul, .message.assistant ol { margin: 4px 0; padding-left: 18px; }
+    .message.assistant li { margin: 2px 0; }
+    .message.assistant strong { font-weight: 600; }
+    .message.assistant em { font-style: italic; }
+
+    .message.assistant code {
+      background: #f1f3f4;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
+    }
+
+    .cell-ref {
+      background: #e8f0fe;
+      color: #1a73e8;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* ─── Onboarding card ────────────────────────────────── */
+    .onboarding-card {
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .onboarding-title {
+      font-weight: 500;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .role-option {
+      display: block;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .role-option:hover { background: #f8f9fa; }
+    .role-option input { margin-right: 8px; }
+
+    .onboarding-btn {
+      margin-top: 12px;
+      width: 100%;
+      padding: 10px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .onboarding-btn:hover { background: #1557b0; }
+
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h1>🥜 Crunchy Sheets</h1>
+    <div class="header-row">
+      <h1>🥜 Crunchy Sheets</h1>
+      <button class="expand-btn" onclick="expandView()" title="Open expanded view">↗</button>
+    </div>
     <div class="subtitle">AI CFO for Google Sheets</div>
   </div>
 
   <div class="user-info" id="userInfo">Connecting...</div>
+
+  <!-- Onboarding -->
+  <div class="onboarding-card" id="onboardingCard" style="display:none;">
+    <div class="onboarding-title">What's your relationship to this workbook?</div>
+    <label class="role-option"><input type="radio" name="userRole" value="builder"> <strong>Builder</strong> — I created or maintain this model</label>
+    <label class="role-option"><input type="radio" name="userRole" value="reviewer"> <strong>Reviewer</strong> — I'm reviewing or auditing this</label>
+    <label class="role-option"><input type="radio" name="userRole" value="inherited"> <strong>Inherited</strong> — I took over someone else's model</label>
+    <label class="role-option"><input type="radio" name="userRole" value="exploring"> <strong>Exploring</strong> — Just looking around</label>
+    <button class="onboarding-btn" onclick="completeOnboarding()">Start</button>
+  </div>
 
   <!-- Skill chips -->
   <div class="skill-bar" id="skillBar"></div>
@@ -408,6 +515,12 @@
           });
         })
         .getSkillRegistry();
+
+      // Check if onboarding is needed
+      checkOnboarding();
+
+      // Restore chat state if returning from expanded view
+      restoreChatState();
     })();
 
     // ─── Chat ───────────────────────────────────────────────────────────
@@ -476,13 +589,77 @@
       }
     }
 
+    // ─── Markdown Rendering ─────────────────────────────────────────────
+
+    /**
+     * Convert markdown-ish text to HTML for assistant messages.
+     * Input must already be HTML-escaped.
+     */
+    function renderMarkdown(text) {
+      var lines = text.split('\n');
+      var html = '';
+      var inList = false;
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+
+        // Headers: ### Header
+        if (/^### (.+)/.test(line)) {
+          if (inList) { html += '</ul>'; inList = false; }
+          html += '<h3>' + applyInline(line.replace(/^### /, '')) + '</h3>';
+          continue;
+        }
+
+        // Bullet list: - item or * item
+        if (/^[\-\*] (.+)/.test(line)) {
+          if (!inList) { html += '<ul>'; inList = true; }
+          html += '<li>' + applyInline(line.replace(/^[\-\*] /, '')) + '</li>';
+          continue;
+        }
+
+        // Close list if we're no longer in one
+        if (inList) { html += '</ul>'; inList = false; }
+
+        // Empty line
+        if (line.trim() === '') {
+          html += '<br>';
+          continue;
+        }
+
+        // Regular paragraph
+        html += '<p>' + applyInline(line) + '</p>';
+      }
+
+      if (inList) { html += '</ul>'; }
+      return html;
+    }
+
+    /**
+     * Apply inline markdown: bold, italic, code, cell references.
+     */
+    function applyInline(text) {
+      // Bold: **text**
+      text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Italic: *text* (but not inside bold)
+      text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      // Inline code: `text`
+      text = text.replace(/`(.+?)`/g, '<code>$1</code>');
+      // Cell references: Sheet!A1:B2 or A1:B2 or A1
+      text = text.replace(/\b([A-Za-z0-9_]+!)?[A-Z]{1,3}[0-9]+(:[A-Z]{1,3}[0-9]+)?\b/g, '<span class="cell-ref">$&</span>');
+      return text;
+    }
+
     // ─── Message Rendering ──────────────────────────────────────────────
 
     function addMessage(text, role) {
       var container = document.getElementById('messages');
       var div = document.createElement('div');
       div.className = 'message ' + role;
-      div.textContent = text;
+      if (role === 'assistant') {
+        div.innerHTML = renderMarkdown(escapeHtml(text));
+      } else {
+        div.textContent = text;
+      }
       container.appendChild(div);
       scrollToBottom();
     }
@@ -725,6 +902,91 @@
       var div = document.createElement('div');
       div.appendChild(document.createTextNode(str));
       return div.innerHTML;
+    }
+
+    // ─── Expand View ──────────────────────────────────────────────────────
+
+    /**
+     * Save chat state and open expanded dialog.
+     */
+    function expandView() {
+      saveChatState();
+      google.script.run.openExpandedView();
+    }
+
+    /**
+     * Serialize visible chat messages to UserProperties for state transfer.
+     */
+    function saveChatState() {
+      var messages = document.querySelectorAll('.message');
+      var state = [];
+      messages.forEach(function(msg) {
+        var role = msg.classList.contains('user') ? 'user' :
+                   msg.classList.contains('assistant') ? 'assistant' : 'system';
+        state.push({ role: role, html: msg.innerHTML });
+      });
+      google.script.run.saveChatHistory(JSON.stringify(state));
+    }
+
+    /**
+     * Restore chat messages from UserProperties (e.g., after expanding to dialog).
+     */
+    function restoreChatState() {
+      google.script.run
+        .withSuccessHandler(function(stateJson) {
+          if (!stateJson) return;
+          try {
+            var state = JSON.parse(stateJson);
+            if (!state.length) return;
+            var container = document.getElementById('messages');
+            container.innerHTML = '';
+            state.forEach(function(msg) {
+              var div = document.createElement('div');
+              div.className = 'message ' + msg.role;
+              div.innerHTML = msg.html;
+              container.appendChild(div);
+            });
+            scrollToBottom();
+            // Clear after restoring so it doesn't re-apply on next open
+            google.script.run.saveChatHistory('');
+          } catch(e) {
+            // Ignore corrupted state
+          }
+        })
+        .loadChatHistory();
+    }
+
+    // ─── Onboarding ───────────────────────────────────────────────────────
+
+    /**
+     * Check if user has completed onboarding; show card if not.
+     */
+    function checkOnboarding() {
+      google.script.run
+        .withSuccessHandler(function(role) {
+          if (!role) {
+            document.getElementById('onboardingCard').style.display = 'block';
+          }
+        })
+        .getUserRole();
+    }
+
+    /**
+     * Save selected role, hide card, show welcome message.
+     */
+    function completeOnboarding() {
+      var selected = document.querySelector('input[name="userRole"]:checked');
+      if (!selected) return;
+      var role = selected.value;
+      google.script.run.saveUserRole(role);
+      document.getElementById('onboardingCard').style.display = 'none';
+      var roleLabels = {
+        builder: "Builder mode — I'll give you direct, technical feedback.",
+        reviewer: "Reviewer mode — I'll focus on flagging risks and inconsistencies.",
+        inherited: "Got it — I'll help you understand what the previous owner built.",
+        exploring: "Let's take a look around. Ask me anything about this workbook."
+      };
+      addMessage(roleLabels[role] || "Let's get started.", 'assistant');
     }
   </script>
 

@@ -114,6 +114,7 @@ interface AnalyzeResponse {
   tokensOut: number;
   summary?: string;
   parseErrors?: string[];
+  formulaXray?: any;
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -176,6 +177,7 @@ export async function handleAnalyze(req: Request): Promise<AnalyzeResponse> {
     tokensOut: message.usage.output_tokens,
     summary: parsed.summary,
     ...(parsed.parseErrors && { parseErrors: parsed.parseErrors }),
+    ...(parsed.formulaXray && { formulaXray: parsed.formulaXray }),
   };
 
   // 7. Track usage in Supabase

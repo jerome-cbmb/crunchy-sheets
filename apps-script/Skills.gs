@@ -85,6 +85,13 @@ var SKILLS = [
     description: 'Side-by-side budget vs actual with variance %, conditional formatting, and commentary.',
     modelTier: 'sonnet',
     category: 'analysis'
+  },
+  {
+    id: 'formula_xray',
+    name: 'Formula X-Ray',
+    description: 'Break down any formula into color-coded components with plain-English explanations.',
+    modelTier: 'sonnet',
+    category: 'analysis'
   }
 ];
 

@@ -19,12 +19,38 @@
 
 import { CellAction } from './analyze';
 
+export interface FormulaXrayComponent {
+  fragment: string;
+  role: 'logic' | 'math' | 'crossref' | 'lookup' | 'aggregation' | 'text' | 'date' | 'error_handling';
+  explanation: string;
+}
+
+export interface FormulaXrayInput {
+  cell: string;
+  sheet: string;
+  label: string;
+  value: any;
+}
+
+export interface FormulaXrayData {
+  type: 'formula_xray';
+  cell: string;
+  sheet: string;
+  raw_formula: string | null;
+  computed_value: any;
+  summary: string;
+  components: FormulaXrayComponent[];
+  inputs: FormulaXrayInput[];
+  tip?: string;
+}
+
 export interface ParsedResponse {
   actions: CellAction[];
   response: string;
   summary?: string;
   rawText: string;
   parseErrors?: string[];
+  formulaXray?: FormulaXrayData;
 }
 
 /**
@@ -58,6 +84,16 @@ export function parseClaudeResponse(claudeText: string): ParsedResponse {
     } catch (e) {
       parseErrors.push(`Failed to parse JSON: ${e}`);
     }
+  }
+
+  // Formula X-Ray early return — skip action validation entirely
+  if (parsedJson && parsedJson.type === 'formula_xray') {
+    return {
+      actions: [],
+      response: parsedJson.summary || '',
+      rawText: claudeText,
+      formulaXray: parsedJson as FormulaXrayData,
+    };
   }
 
   // Extract the fields

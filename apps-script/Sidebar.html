@@ -429,6 +429,165 @@
 
     .onboarding-btn:hover { background: #1557b0; }
 
+    /* ─── Formula X-Ray Card ──────────────────────────────── */
+    .xray-card {
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      max-width: 100%;
+    }
+
+    .xray-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #e8f0fe;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1a73e8;
+    }
+
+    .xray-cell-badge {
+      display: inline-block;
+      background: #1e8e3e;
+      color: white;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .xray-computed {
+      color: #3c4043;
+      font-size: 12px;
+      font-weight: 400;
+    }
+
+    .xray-formula-bar {
+      background: #202124;
+      color: #e8eaed;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      padding: 10px 14px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .xray-section {
+      padding: 10px 14px;
+      border-top: 1px solid #f1f3f4;
+    }
+
+    .xray-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #5f6368;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .xray-component {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #f1f3f4;
+      font-size: 12px;
+    }
+
+    .xray-component:last-child { border-bottom: none; }
+
+    .xray-role-tag {
+      display: inline-block;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .xray-role-tag.logic         { background: #fce8e6; color: #d93025; }
+    .xray-role-tag.math          { background: #e8f0fe; color: #1a73e8; }
+    .xray-role-tag.crossref      { background: #e6f4ea; color: #1e8e3e; }
+    .xray-role-tag.lookup        { background: #f3e8fd; color: #8430ce; }
+    .xray-role-tag.aggregation   { background: #fef7e0; color: #e37400; }
+    .xray-role-tag.text          { background: #e8eaed; color: #3c4043; }
+    .xray-role-tag.date          { background: #e0f7fa; color: #00796b; }
+    .xray-role-tag.error_handling { background: #fce8e6; color: #c5221f; }
+
+    .xray-fragment {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      color: #202124;
+      word-break: break-all;
+    }
+
+    .xray-explanation {
+      color: #5f6368;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .xray-input-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      font-size: 11px;
+      border-bottom: 1px solid #f1f3f4;
+    }
+
+    .xray-input-row:last-child { border-bottom: none; }
+
+    .xray-input-cell {
+      font-family: 'Roboto Mono', monospace;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .xray-input-cell.crossref { color: #1e8e3e; }
+    .xray-input-cell.local    { color: #1a73e8; }
+
+    .xray-input-label {
+      color: #5f6368;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .xray-input-value {
+      color: #3c4043;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .xray-tip {
+      background: #fef7e0;
+      border-top: 1px solid #fdd835;
+      padding: 8px 14px;
+      font-size: 11px;
+      color: #e37400;
+      line-height: 1.4;
+    }
+
+    .xray-summary {
+      padding: 10px 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #3c4043;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -569,6 +728,12 @@
 
       if (result.error) {
         addMessage('⚠ ' + result.error, 'system');
+        return;
+      }
+
+      // Formula X-Ray: render rich card instead of normal flow
+      if (result.formulaXray) {
+        renderFormulaXray(result.formulaXray);
         return;
       }
 
@@ -826,6 +991,101 @@
       }
 
       container.appendChild(panel);
+      scrollToBottom();
+    }
+
+    // ─── Formula X-Ray Renderer ────────────────────────────────────────
+
+    /**
+     * Render a Formula X-Ray card in the chat area.
+     */
+    function renderFormulaXray(xray) {
+      var container = document.getElementById('messages');
+      var card = document.createElement('div');
+      card.className = 'xray-card';
+
+      // Header: cell badge + computed value
+      var header = document.createElement('div');
+      header.className = 'xray-header';
+      var cellRef = (xray.sheet || '') + '!' + (xray.cell || '?');
+      header.innerHTML = '<span class="xray-cell-badge">' + escapeHtml(cellRef) + '</span>';
+      if (xray.computed_value !== null && xray.computed_value !== undefined) {
+        header.innerHTML += ' <span class="xray-computed">= ' + escapeHtml(String(xray.computed_value)) + '</span>';
+      }
+      card.appendChild(header);
+
+      // Formula bar
+      if (xray.raw_formula) {
+        var bar = document.createElement('div');
+        bar.className = 'xray-formula-bar';
+        bar.textContent = xray.raw_formula;
+        card.appendChild(bar);
+      }
+
+      // Summary
+      if (xray.summary) {
+        var summaryDiv = document.createElement('div');
+        summaryDiv.className = 'xray-summary';
+        summaryDiv.textContent = xray.summary;
+        card.appendChild(summaryDiv);
+      }
+
+      // Components breakdown
+      if (xray.components && xray.components.length > 0) {
+        var compSection = document.createElement('div');
+        compSection.className = 'xray-section';
+        compSection.innerHTML = '<div class="xray-section-title">Breakdown</div>';
+
+        xray.components.forEach(function(comp) {
+          var row = document.createElement('div');
+          row.className = 'xray-component';
+
+          var role = comp.role || 'math';
+          row.innerHTML =
+            '<span class="xray-role-tag ' + escapeHtml(role) + '">' + escapeHtml(role) + '</span>' +
+            '<div><div class="xray-fragment">' + escapeHtml(comp.fragment || '') + '</div>' +
+            '<div class="xray-explanation">' + escapeHtml(comp.explanation || '') + '</div></div>';
+
+          compSection.appendChild(row);
+        });
+
+        card.appendChild(compSection);
+      }
+
+      // Inputs
+      if (xray.inputs && xray.inputs.length > 0) {
+        var inputSection = document.createElement('div');
+        inputSection.className = 'xray-section';
+        inputSection.innerHTML = '<div class="xray-section-title">Referenced Cells</div>';
+
+        xray.inputs.forEach(function(input) {
+          var row = document.createElement('div');
+          row.className = 'xray-input-row';
+
+          var isCrossref = input.sheet && xray.sheet && input.sheet !== xray.sheet;
+          var cellClass = isCrossref ? 'crossref' : 'local';
+          var cellDisplay = input.sheet ? input.sheet + '!' + input.cell : input.cell;
+
+          row.innerHTML =
+            '<span class="xray-input-cell ' + cellClass + '">' + escapeHtml(cellDisplay) + '</span>' +
+            '<span class="xray-input-label">' + escapeHtml(input.label || '') + '</span>' +
+            '<span class="xray-input-value">' + escapeHtml(String(input.value != null ? input.value : '')) + '</span>';
+
+          inputSection.appendChild(row);
+        });
+
+        card.appendChild(inputSection);
+      }
+
+      // Tip
+      if (xray.tip) {
+        var tipDiv = document.createElement('div');
+        tipDiv.className = 'xray-tip';
+        tipDiv.textContent = xray.tip;
+        card.appendChild(tipDiv);
+      }
+
+      container.appendChild(card);
       scrollToBottom();
     }
 

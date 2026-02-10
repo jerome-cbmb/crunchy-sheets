@@ -21,10 +21,10 @@ Sidebar preview  ←  Apps Script applyActions()  ←  action-parser validates  
 3. `Code.gs:analyzeWorkbook()` calls `serializeWorkbookState()` + reads `userRole` from UserProperties
 4. Serialized state + prompt + userRole + Bearer token sent via `UrlFetchApp.fetch()` to Cloud Function `/analyze`
 5. `analyze.ts:handleAnalyze()` verifies Google OAuth token, routes to skill, builds user message with role context, calls Claude
-6. Claude returns JSON with `actions[]`, `response`, `summary`
-7. `action-parser.ts:parseClaudeResponse()` extracts and validates the JSON block
-8. Result returned to sidebar → assistant response rendered as markdown (bold, bullets, cell-ref styling) + actions preview panel
-9. User clicks "Apply All" → `google.script.run.applyActions(actions)`
+6. Claude returns JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` for X-Ray skill)
+7. `action-parser.ts:parseClaudeResponse()` extracts and validates the JSON block. Formula X-Ray responses short-circuit with `formulaXray` passthrough (no action validation)
+8. Result returned to sidebar → assistant response rendered as markdown + actions preview panel. Formula X-Ray renders a color-coded breakdown card instead
+9. User clicks "Apply All" → `google.script.run.applyActions(actions)` (X-Ray is read-only, no actions)
 10. `ActionExecutor.gs:executeActions()` applies each action to the spreadsheet
 
 ## Project Structure
@@ -33,11 +33,11 @@ Sidebar preview  ←  Apps Script applyActions()  ←  action-parser validates  
 crunchy-sheets/
 ├── apps-script/              # Google Apps Script add-on (deployed via clasp)
 │   ├── Code.gs               # Menu, sidebar launcher, analyzeWorkbook(), applyActions(), expanded view, user role persistence
-│   ├── Sidebar.html          # Chat UI, markdown rendering, skill chips, action preview/apply, onboarding, expand-to-dialog
+│   ├── Sidebar.html          # Chat UI, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, expand-to-dialog
 │   ├── WorkbookState.gs      # Workbook → JSON serializer (RLM core)
 │   ├── ActionExecutor.gs     # Applies CellAction[] to the spreadsheet
 │   ├── OAuth.gs              # getAuthToken(), checkAuthStatus(), registerUser()
-│   ├── Skills.gs             # 10 financial skills registry (sidebar dropdown source)
+│   ├── Skills.gs             # 11 financial skills registry (sidebar dropdown source)
 │   ├── appsscript.json       # Manifest (V8 runtime, America/New_York)
 │   └── .clasp.json           # Bound to test spreadsheet (parentId: 1hzhET6...)
 │
@@ -45,8 +45,8 @@ crunchy-sheets/
 │   ├── src/
 │   │   ├── index.ts          # HTTP entry points: /analyze and /auth (CORS, routing)
 │   │   ├── analyze.ts        # Core handler: auth → skill route → Claude call (with temporal awareness + user role context) → parse → track usage
-│   │   ├── skill-router.ts   # 10 skill definitions with keywords, instructions, model tiers
-│   │   ├── action-parser.ts  # Extracts JSON from Claude response, validates each action
+│   │   ├── skill-router.ts   # 11 skill definitions with keywords, instructions, model tiers
+│   │   ├── action-parser.ts  # Extracts JSON from Claude response, validates each action; formula_xray passthrough
 │   │   └── auth.ts           # Google OAuth token verification, Supabase user upsert
 │   ├── package.json
 │   └── tsconfig.json         # Strict, ES2022, commonjs output to dist/
@@ -73,24 +73,25 @@ Claude returns these in the `actions[]` array. ActionExecutor.gs applies them to
 
 Each action is independently try/caught — one failure doesn't stop the batch.
 
-## 10 Financial Skills
+## 11 Financial Skills
 
 Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt → keyword regex auto-detect → default (general analysis, Sonnet).
 
-| Skill | Model | Category |
-|-------|-------|----------|
-| Variance Analysis | Sonnet | analysis |
-| Cash Flow Forecasting | Opus | modeling |
-| Revenue Waterfall | Sonnet | analysis |
-| Expense Categorization | Sonnet | automation |
-| Unit Economics | Opus | analysis |
-| Cohort Analysis | Opus | analysis |
-| Scenario Modeling | Opus | modeling |
-| KPI Dashboard | Sonnet | reporting |
-| Investor Metrics | Sonnet | reporting |
-| Budget vs Actual | Sonnet | analysis |
+| Skill | Model | Category | Notes |
+|-------|-------|----------|-------|
+| Variance Analysis | Sonnet | analysis | |
+| Cash Flow Forecasting | Opus | modeling | |
+| Revenue Waterfall | Sonnet | analysis | |
+| Expense Categorization | Sonnet | automation | |
+| Unit Economics | Opus | analysis | |
+| Cohort Analysis | Opus | analysis | |
+| Scenario Modeling | Opus | modeling | |
+| KPI Dashboard | Sonnet | reporting | |
+| Investor Metrics | Sonnet | reporting | |
+| Budget vs Actual | Sonnet | analysis | |
+| Formula X-Ray | Sonnet | analysis | Read-only; returns `formula_xray` JSON instead of actions |
 
-Sonnet skills are fast/cheap. Opus skills require deeper reasoning.
+Sonnet skills are fast/cheap. Opus skills require deeper reasoning. Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip }` — that bypasses action validation and renders as a color-coded card in the sidebar.
 
 ## Financial Formatting Conventions (non-negotiable)
 

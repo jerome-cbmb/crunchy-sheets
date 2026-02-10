@@ -113,6 +113,68 @@ const SKILL_DEFINITIONS: SkillDefinition[] = [
     instruction: 'Create a side-by-side budget vs actual comparison with $ and % variance, conditional formatting.',
     systemAddendum: '\nFor BvA, highlight favorable variances in green and unfavorable in red. Add a commentary column for top-5 variances.',
   },
+  {
+    id: 'formula_xray',
+    modelTier: 'sonnet',
+    maxTokens: 4096,
+    keywords: /explain.*formula|formula.*explain|x-ray|xray|break.*down.*formula|#explain|explain.*cell|what.*does.*formula/i,
+    instruction: 'Analyze the formula in the specified cell. If no cell is specified, pick the most complex formula on the active sheet. Return ONLY the formula_xray JSON — do NOT return the normal actions/response format.',
+    systemAddendum: `
+FORMULA X-RAY MODE — this overrides the normal action format.
+
+Return ONLY a JSON block with this exact structure:
+
+\`\`\`json
+{
+  "type": "formula_xray",
+  "cell": "B14",
+  "sheet": "Calculations",
+  "raw_formula": "=SUMPRODUCT((Revenue!B2:B13)*(Assumptions!C2:C13))",
+  "computed_value": 1250000,
+  "summary": "Multiplies monthly revenue by growth rates and sums the result.",
+  "components": [
+    {
+      "fragment": "SUMPRODUCT(...)",
+      "role": "aggregation",
+      "explanation": "Sums the element-wise products of two arrays"
+    },
+    {
+      "fragment": "Revenue!B2:B13",
+      "role": "crossref",
+      "explanation": "Monthly revenue figures from the Revenue tab"
+    },
+    {
+      "fragment": "Assumptions!C2:C13",
+      "role": "crossref",
+      "explanation": "Growth rate assumptions for each month"
+    }
+  ],
+  "inputs": [
+    { "cell": "B2:B13", "sheet": "Revenue", "label": "Monthly Revenue", "value": "[12 values]" },
+    { "cell": "C2:C13", "sheet": "Assumptions", "label": "Growth Rates", "value": "[12 values]" }
+  ],
+  "tip": "Consider using a named range for the growth rates to make this formula easier to audit."
+}
+\`\`\`
+
+Component roles (use exactly these strings):
+- "logic" — IF, IFS, SWITCH, AND, OR, NOT
+- "math" — SUM, AVERAGE, arithmetic operators
+- "crossref" — references to other sheets (Sheet!Cell)
+- "lookup" — VLOOKUP, HLOOKUP, INDEX/MATCH, XLOOKUP
+- "aggregation" — SUMPRODUCT, SUMIFS, COUNTIFS, AVERAGEIFS
+- "text" — CONCATENATE, LEFT, RIGHT, MID, TEXT
+- "date" — DATE, EDATE, EOMONTH, YEAR, MONTH
+- "error_handling" — IFERROR, IFNA, ISERROR
+
+Edge cases:
+- If the cell contains a static value (no formula): set raw_formula to null, components and inputs to empty arrays, summary to "Static value — no formula to analyze."
+- If the cell is empty: set raw_formula and computed_value to null, summary to "Empty cell."
+- If the formula produces an error (#REF!, #VALUE!, etc.): include the error string in computed_value and explain what went wrong in summary.
+- If no cell is specified in the user's prompt: pick the most complex formula on the active sheet (deepest nesting or most references).
+
+Do NOT include an "actions" array. Do NOT include a "response" field. Return ONLY the formula_xray JSON block.`,
+  },
 ];
 
 // ─── Router ──────────────────────────────────────────────────────────────────

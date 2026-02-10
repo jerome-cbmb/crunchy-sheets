@@ -119,6 +119,28 @@ function analyzeWorkbook(userPrompt) {
   return result;
 }
 
+/**
+ * Returns the workbook state + auth token for direct streaming from sidebar.
+ * The sidebar calls this, then uses fetch() to stream from Vercel.
+ *
+ * @param {string} userPrompt - The user's question or instruction.
+ * @return {Object} Payload for the Vercel /analyze endpoint.
+ */
+function getAnalyzePayload(userPrompt) {
+  var state = serializeWorkbookState();
+  var token = ScriptApp.getOAuthToken();
+  var userRole = getUserRole();
+
+  return {
+    workbookState: state,
+    prompt: userPrompt,
+    token: token,
+    spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+    userEmail: Session.getActiveUser().getEmail(),
+    userRole: userRole || undefined
+  };
+}
+
 // ─── Action Execution ────────────────────────────────────────────────────────
 
 /**

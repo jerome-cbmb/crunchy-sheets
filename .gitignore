@@ -1,0 +1,17 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env.local
+.env*.local
+
+# Cloud Functions build output
+cloud-functions/dist/
+
+# OS
+.DS_Store
+.vercel

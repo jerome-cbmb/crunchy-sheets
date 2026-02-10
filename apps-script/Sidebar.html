@@ -588,6 +588,19 @@
       color: #3c4043;
     }
 
+    /* ─── Streaming indicator ──────────────────────────────── */
+    .message.assistant.streaming::after {
+      content: '▊';
+      animation: blink 0.7s infinite;
+      color: #1a73e8;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -631,6 +644,10 @@
   </div>
 
   <script>
+    // ─── Configuration ─────────────────────────────────────────────────
+    // TODO: Set to production domain (e.g., https://api.crunchy.tools)
+    var VERCEL_API_BASE = 'https://crunchy-sheets.vercel.app';
+
     // ─── State ──────────────────────────────────────────────────────────
     var selectedSkill = null;
     var pendingActions = null; // Actions awaiting user confirmation
@@ -705,13 +722,259 @@
         fullPrompt = '[skill:' + selectedSkill + '] ' + text;
       }
 
+      // Step 1: Get payload from Apps Script (workbook state + auth token)
       google.script.run
-        .withSuccessHandler(handleAnalyzeResult)
+        .withSuccessHandler(function(payload) {
+          streamAnalysis(payload);
+        })
         .withFailureHandler(function(err) {
           setLoading(false);
-          addMessage('⚠ Error: ' + err.message, 'system');
+          addMessage('⚠ Error preparing request: ' + err.message, 'system');
         })
-        .analyzeWorkbook(fullPrompt);
+        .getAnalyzePayload(fullPrompt);
+    }
+
+    // ─── Streaming ───────────────────────────────────────────────────────
+
+    /**
+     * Create a message div for progressive streaming rendering.
+     */
+    function createStreamingMessage() {
+      var container = document.getElementById('messages');
+      var div = document.createElement('div');
+      div.className = 'message assistant streaming';
+      div.innerHTML = '';
+      container.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    /**
+     * Update a streaming message div with accumulated text (progressive markdown).
+     */
+    function updateStreamingMessage(div, text) {
+      // Strip any JSON code block from display during streaming
+      var displayText = text.replace(/```json[\s\S]*?```/g, '').trim();
+      if (displayText) {
+        div.innerHTML = renderMarkdown(escapeHtml(displayText));
+      }
+    }
+
+    /**
+     * Remove the streaming class and finalize the message.
+     */
+    function removeStreamingIndicator(div) {
+      div.classList.remove('streaming');
+    }
+
+    /**
+     * Stream analysis from Vercel endpoint.
+     * Uses fetch() + ReadableStream for progressive rendering.
+     */
+    async function streamAnalysis(payload) {
+      var msgDiv = createStreamingMessage();
+
+      try {
+        var response = await fetch(VERCEL_API_BASE + '/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + payload.token
+          },
+          body: JSON.stringify({
+            workbookState: payload.workbookState,
+            prompt: payload.prompt,
+            spreadsheetId: payload.spreadsheetId,
+            userEmail: payload.userEmail,
+            userRole: payload.userRole,
+            skill: selectedSkill || undefined
+          })
+        });
+
+        if (!response.ok) {
+          var errText = await response.text();
+          throw new Error(response.status + ': ' + errText);
+        }
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var accumulated = '';
+
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          accumulated += decoder.decode(chunk.value, { stream: true });
+          updateStreamingMessage(msgDiv, accumulated);
+          scrollToBottom();
+        }
+
+        // Stream complete
+        setLoading(false);
+        removeStreamingIndicator(msgDiv);
+        finalizeStreamedMessage(msgDiv, accumulated);
+
+      } catch (err) {
+        setLoading(false);
+        removeStreamingIndicator(msgDiv);
+        if (msgDiv.parentNode) msgDiv.remove();
+        addMessage('⚠ Error: ' + err.message, 'system');
+      }
+    }
+
+    /**
+     * Parse the completed streamed response for actions/xray.
+     */
+    function finalizeStreamedMessage(msgDiv, fullText) {
+      var parsed = parseStreamedResponse(fullText);
+
+      // Formula X-Ray — replace streaming div with xray card
+      if (parsed.formulaXray) {
+        msgDiv.remove();
+        renderFormulaXray(parsed.formulaXray);
+        return;
+      }
+
+      // Replace raw stream with clean response text
+      msgDiv.innerHTML = renderMarkdown(escapeHtml(parsed.response));
+
+      // Parse warnings
+      if (parsed.parseErrors && parsed.parseErrors.length > 0) {
+        addParseWarnings(parsed.parseErrors);
+      }
+
+      // Actions panel
+      if (parsed.actions && parsed.actions.length > 0) {
+        pendingActions = parsed.actions;
+        addActionsPanel(parsed.actions);
+      }
+    }
+
+    /**
+     * Client-side response parser (mirrors action-parser.ts logic).
+     * Extracts JSON from the streamed text and validates actions.
+     */
+    function parseStreamedResponse(claudeText) {
+      var parseErrors = [];
+
+      // Try to find a JSON code block
+      var jsonMatch = claudeText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      var jsonText = null;
+
+      if (jsonMatch) {
+        jsonText = jsonMatch[1].trim();
+      } else {
+        var trimmed = claudeText.trim();
+        if (trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}') {
+          jsonText = trimmed;
+        }
+      }
+
+      var parsedJson = null;
+      if (jsonText) {
+        try {
+          parsedJson = JSON.parse(jsonText);
+        } catch (e) {
+          parseErrors.push('Failed to parse JSON: ' + e);
+        }
+      }
+
+      // Formula X-Ray passthrough
+      if (parsedJson && parsedJson.type === 'formula_xray') {
+        return {
+          actions: [],
+          response: parsedJson.summary || '',
+          formulaXray: parsedJson
+        };
+      }
+
+      var actions = [];
+      var response = claudeText;
+      var summary = undefined;
+
+      if (parsedJson) {
+        // Validate actions
+        if (Array.isArray(parsedJson.actions)) {
+          parsedJson.actions.forEach(function(action) {
+            var v = validateActionClient(action);
+            if (v.valid) {
+              actions.push(action);
+            } else {
+              parseErrors.push(v.error);
+            }
+          });
+        }
+
+        if (typeof parsedJson.response === 'string') {
+          response = parsedJson.response;
+        }
+
+        if (typeof parsedJson.summary === 'string') {
+          summary = parsedJson.summary;
+        }
+      }
+
+      return {
+        actions: actions,
+        response: response,
+        summary: summary,
+        parseErrors: parseErrors.length > 0 ? parseErrors : undefined,
+        formulaXray: undefined
+      };
+    }
+
+    /**
+     * Client-side action validation (mirrors validateAction in action-parser.ts).
+     */
+    function validateActionClient(action) {
+      if (!action || typeof action !== 'object') {
+        return { valid: false, error: 'Action is not an object' };
+      }
+
+      var type = action.type;
+      var validTypes = ['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range'];
+      if (!type || validTypes.indexOf(type) === -1) {
+        return { valid: false, error: 'Invalid action type: ' + type };
+      }
+
+      switch (type) {
+        case 'set_value':
+        case 'set_formula':
+          if (!action.sheet || !action.cell) {
+            return { valid: false, error: type + ' requires sheet and cell' };
+          }
+          if (type === 'set_formula' && !action.formula) {
+            return { valid: false, error: 'set_formula requires formula field' };
+          }
+          if (type === 'set_value' && action.value === undefined) {
+            return { valid: false, error: 'set_value requires value field' };
+          }
+          break;
+        case 'format_cell':
+          if (!action.sheet || !action.cell) {
+            return { valid: false, error: 'format_cell requires sheet and cell' };
+          }
+          if (!action.format || typeof action.format !== 'object') {
+            return { valid: false, error: 'format_cell requires format object' };
+          }
+          break;
+        case 'add_sheet':
+          if (!action.sheetName) {
+            return { valid: false, error: 'add_sheet requires sheetName' };
+          }
+          break;
+        case 'rename_sheet':
+          if (!action.sheet || !action.sheetName) {
+            return { valid: false, error: 'rename_sheet requires sheet and sheetName' };
+          }
+          break;
+        case 'add_named_range':
+          if (!action.rangeName || !action.rangeA1) {
+            return { valid: false, error: 'add_named_range requires rangeName and rangeA1' };
+          }
+          break;
+      }
+
+      return { valid: true };
     }
 
     /**

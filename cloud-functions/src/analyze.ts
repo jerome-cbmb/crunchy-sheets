@@ -151,7 +151,7 @@ export async function handleAnalyze(req: Request): Promise<AnalyzeResponse> {
   // 5. Call Claude
   const message = await anthropic.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: skillContext.maxTokens,
     system: SYSTEM_PROMPT + (skillContext.systemAddendum || ''),
     messages: [
       { role: 'user', content: userMessage }

@@ -1170,22 +1170,25 @@
      * Save chat state and open expanded dialog.
      */
     function expandView() {
-      saveChatState();
-      google.script.run.openExpandedView();
+      saveChatState(function() {
+        google.script.run.openExpandedView();
+        google.script.host.close();
+      });
     }
 
     /**
      * Serialize visible chat messages to UserProperties for state transfer.
      */
-    function saveChatState() {
-      var messages = document.querySelectorAll('.message');
+    function saveChatState(onDone) {
+      var container = document.getElementById('messages');
+      var children = container.children;
       var state = [];
-      messages.forEach(function(msg) {
-        var role = msg.classList.contains('user') ? 'user' :
-                   msg.classList.contains('assistant') ? 'assistant' : 'system';
-        state.push({ role: role, html: msg.innerHTML });
-      });
-      google.script.run.saveChatHistory(JSON.stringify(state));
+      for (var i = 0; i < children.length; i++) {
+        state.push(children[i].outerHTML);
+      }
+      var runner = google.script.run;
+      if (onDone) runner = runner.withSuccessHandler(onDone);
+      runner.saveChatHistory(JSON.stringify(state));
     }
 
     /**
@@ -1199,15 +1202,8 @@
             var state = JSON.parse(stateJson);
             if (!state.length) return;
             var container = document.getElementById('messages');
-            container.innerHTML = '';
-            state.forEach(function(msg) {
-              var div = document.createElement('div');
-              div.className = 'message ' + msg.role;
-              div.innerHTML = msg.html;
-              container.appendChild(div);
-            });
+            container.innerHTML = state.join('');
             scrollToBottom();
-            // Clear after restoring so it doesn't re-apply on next open
             google.script.run.saveChatHistory('');
           } catch(e) {
             // Ignore corrupted state

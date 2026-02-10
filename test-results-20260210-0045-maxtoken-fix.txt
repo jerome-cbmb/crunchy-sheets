@@ -1,0 +1,2314 @@
+
+🥜 Crunchy Sheets — Demo Test Runner
+Running 20 demo(s) against mock SaaS financial model
+Model: claude-sonnet-4-5 (default) / claude-opus-4-6 (opus-tier skills)
+Workbook: SaaS Financial Model — Acme Corp (5 tabs)
+
+  Running Demo #1: First Open Greeting... ✅ (0 actions, 10.1s)
+  Running Demo #2: Formula Chain Walkthrough... ✅ (0 actions, 8.5s)
+  Running Demo #3: Dependency Tracing... ✅ (0 actions, 7.2s)
+  Running Demo #13: Financial Commentary... ✅ (0 actions, 5.6s)
+  Running Demo #14: Anomaly Flagging... ✅ (0 actions, 12.2s)
+  Running Demo #4: Variance Analysis... ✅ (0 actions, 10.2s)
+  Running Demo #7: Investor Metrics... ✅ (18 actions, 18.4s)
+  Running Demo #12: How-To Guide... ✅ (0 actions, 10.6s)
+  Running Demo #15: Named Range Audit... ✅ (8 actions, 6.9s)
+  Running Demo #19: Unit Economics Deep Dive... ✅ (0 actions, 46.0s)
+  Running Demo #5: KPI Dashboard Build... ✅ (24 actions, 17.6s)
+  Running Demo #6: Scenario Model Toggle... ✅ (48 actions, 30.1s)
+  Running Demo #8: Cash Flow Forecast... ✅ (0 actions, 39.0s)
+  Running Demo #9: Budget vs Actual... ✅ (0 actions, 35.2s)
+  Running Demo #11: Revenue Waterfall... ✅ (0 actions, 34.5s)
+  Running Demo #16: Create Named Ranges... ✅ (6 actions, 6.4s)
+  Running Demo #17: Hard-Coded Quarterly Snapshot... ✅ (40 actions, 20.9s)
+  Running Demo #20: Cohort Analysis... ✅ (0 actions, 32.5s)
+  Running Demo #10: Cleanup Mode... ✅ (76 actions, 36.9s)
+  Running Demo #18: @CRUNCHY Comment Commands... ✅ (0 actions, 8.2s)
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #1: First Open Greeting (Phase A)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "What am I looking at?"
+Role: exploring
+Expected: Brief structural overview: 5 tabs, SaaS financial model, key metrics. Should reference specific tab names and what each does. No actions.
+────────────────────────────────────────────────────────────────────────────────
+Response (326 tokens out, 5550 tokens in, 10.1s):
+
+This is a SaaS financial model for Acme Corp tracking 2024 performance (Jan-Dec). Most recent actuals run through Dec-24, which is 14 months ago.
+
+**Structure:**
+- **Assumptions** — 11 key inputs (MRR, growth rate, CAC, churn, etc.) driving the model
+- **P&L** — Monthly income statement with subscription + services revenue, COGS, OpEx
+- **Cash Flow** — Beginning cash ($2.5M), burn tracking, runway calculation
+- **KPIs** — Dashboard pulling key metrics (MRR, ARR, gross margin, runway)
+- **Scenarios** — Bull/Base/Bear cases for growth and churn (not yet wired into the model)
+
+**What it shows:**
+Starting MRR of $125K growing at 8%/month → ending ARR of $3.5M. The company is burning ~$23K/month in Jan-24 with 105 months of runway. Gross margin sits at 79%, but OpEx ($132K) exceeds gross profit ($110K), hence the negative EBITDA.
+
+**Color-coding is inconsistent** — blue inputs mixed with black text. Formulas reference `Assumptions!B3` directly instead of using the named ranges (`Growth_Rate`, `Churn_Rate`) that exist but aren't applied.
+
+What would you like to explore or fix?
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #2: Formula Chain Walkthrough (Phase A)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Walk me through how revenue flows from the Assumptions tab to the P&L."
+Expected: Traces Growth_Rate (Assumptions!B3) → Subscription Revenue formula (P&L!C4) → Total Revenue (P&L!B7). References specific cells.
+────────────────────────────────────────────────────────────────────────────────
+Response (333 tokens out, 5539 tokens in, 8.5s):
+
+## Revenue Flow: Assumptions → P&L
+
+**Starting Point:**
+- `Assumptions!B2` = $125k Starting MRR (blue input)
+- `Assumptions!B3` = 8% Monthly Growth Rate (named range: `Growth_Rate`)
+
+**P&L Calculation Chain:**
+1. **Jan-24 (B4):** Hard-coded $125k (matches starting MRR)
+2. **Feb-24 (C4):** `=B4*(1+Assumptions!B3)` → $135k
+3. **Mar-24+ (D4:M4):** Each month compounds the prior month by 8%
+
+**Result:** MRR grows from $125k → $291k over 12 months.
+
+**Issues I See:**
+- ❌ Jan-24 MRR is hard-coded, not a formula. If you change `Assumptions!B2`, P&L won't update.
+- ❌ Growth rate references `Assumptions!B3` directly, not the named range `Growth_Rate`. Inconsistent.
+- ⚠️ Note: Most recent actuals are through Dec-24 (13 months ago).
+
+**Fix:** Change `P&L!B4` to `=Assumptions!B2` and update all growth formulas to use `=PREVIOUS_CELL*(1+Growth_Rate)`.
+
+Want me to make those changes?
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #3: Dependency Tracing (Phase A)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "If I change the growth rate in Assumptions!B3, what breaks?"
+Expected: Lists all cells that depend on Growth_Rate: subscription revenue chain, total revenue, ARR, gross profit, EBITDA, net income, cash flow.
+────────────────────────────────────────────────────────────────────────────────
+Response (230 tokens out, 5538 tokens in, 7.2s):
+
+**Nothing breaks.** Growth_Rate (B3) flows cleanly into P&L!C4:M4 (subscription revenue). All downstream formulas (Total Revenue, Gross Profit, EBITDA, etc.) cascade correctly.
+
+**What changes:**
+- P&L subscription revenue (row 4)
+- Total revenue, gross profit, EBITDA (all months)
+- ARR endpoint (M8)
+- KPIs!B2-B3 (MRR/ARR reflect Feb-24 only, won't auto-update for Dec)
+- Cash flow impact via net income
+
+**Note:** MRR in KPIs references Jan-24 (B2), not the growth-adjusted periods. If you want real-time MRR tracking, reference P&L!M4 instead.
+
+Summary: Analyzed dependency chain for Growth_Rate input
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #13: Financial Commentary (Phase A)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Write a 3-sentence board-ready summary of this company's financial position."
+Expected: Concise commentary referencing ARR trajectory, burn rate, gross margin. Suitable for a board memo. Notes data is from 2024.
+────────────────────────────────────────────────────────────────────────────────
+Response (163 tokens out, 5539 tokens in, 5.6s):
+
+Acme Corp achieved $1.5M ARR in Jan-24 (most recent actuals, 14 months ago) with 8% monthly growth, but is burning $23.5K/month at -15.7% EBITDA margin. The company maintains strong unit economics (78.6% gross margin) and has 105 months of runway from a $2.5M cash position. Primary risk: the model shows no path to profitability despite aggressive growth — OpEx ($132K) significantly exceeds gross profit ($110K).
+
+Summary: Analyzed financial health and summarized board-ready position
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #14: Anomaly Flagging (Phase A)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Flag anything in this model that looks off or inconsistent."
+Expected: Identifies: Services Revenue is all hard-coded (no formula pattern), Rule of 40 is blank, missing months in some rows, COGS only has Jan data.
+────────────────────────────────────────────────────────────────────────────────
+Response (393 tokens out, 5534 tokens in, 12.2s):
+
+**Critical Issues:**
+
+• **Stale data** — Most recent actuals are from Dec-24, which is 2 months ago. Model needs an update.
+
+• **Incomplete formulas** — COGS only calculated for Jan-24 (B11:B12). Feb-Dec are blank, making Gross Profit/Margin unreliable after Jan.
+
+• **OpEx not built out** — Only Jan-24 has values (B19:B21). Rest of year is empty, so EBITDA calculations fail after Jan.
+
+• **Cash Flow undermapped** — Only pulls Jan Net Income. Feb-Dec cash flow not calculated.
+
+• **Rule of 40 empty** — KPIs!B8:C8 shows "Not calculated". Should be `Growth Rate + EBITDA Margin`.
+
+• **Scenarios disconnected** — Scenarios sheet exists but isn't wired to drive Assumptions. No scenario toggle.
+
+• **Headcount static** — B33:B35 show headcount but no growth despite 5%/month assumption (B10). Should compound monthly.
+
+• **ARR inconsistency** — Named range `ARR` points to P&L!B8 (Jan only). M8 calculates Dec ARR but isn't captured.
+
+**Structure:**
+Model has good bones (named ranges, logical tabs) but is incomplete. Looks like it was started then abandoned mid-build.
+
+Summary: Flagged 8 structural issues: incomplete formulas, stale data, disconnected scenarios
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #4: Variance Analysis (Phase B)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Run a variance analysis on the P&L. What are the top 3 drivers of the revenue trend?"
+Skill: variance_analysis
+Expected: Identifies growth drivers: subscription revenue growth at 8%/mo compound, services revenue variability, mix shift. References specific cells.
+────────────────────────────────────────────────────────────────────────────────
+Response (352 tokens out, 5610 tokens in, 10.2s):
+
+**Variance Analysis: Revenue Trend (Jan-Dec 2024)**
+
+**Top 3 Drivers:**
+
+1. **Compounding 8% MRR Growth** — Subscription revenue (B4:M4) grew from $125K → $291K (+133%). This is the dominant driver, compounding monthly at the 8% assumption in B3.
+
+2. **Volatile Services Revenue** — Services (B5:M5) swung from $12K to $22K with no clear pattern. This adds noise but is immaterial vs. subscription base (avg 6% of total revenue).
+
+3. **No Churn Impact Visible** — Despite a 2.5% monthly churn assumption (B6), the model shows pure growth with no offsetting losses. This suggests churn isn't factored into the MRR formula (C4 onward).
+
+**Key Issue:** The subscription formula doesn't account for churn. At 2.5% monthly churn, Dec MRR should be ~$235K, not $291K. This overstates ARR by ~$675K.
+
+**Note:** Most recent data is from Dec-24, which is 14 months ago relative to today (Feb-26).
+
+Summary: Analyzed revenue trend: 8% growth compounds to 133% gain, but churn isn't modeled in MRR formulas
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #7: Investor Metrics (Phase B)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Calculate the key investor metrics: Rule of 40, burn multiple, and magic number."
+Skill: investor_metrics
+Expected: Computes Rule of 40 (revenue growth % + EBITDA margin), burn multiple, magic number. Notes what data is needed for complete calculation.
+────────────────────────────────────────────────────────────────────────────────
+Response (1330 tokens out, 5584 tokens in, 18.4s):
+
+**Rule of 40: 117.4%** — Strong. YoY growth (133%) + EBITDA margin (-15.6%). Growing fast, burning at scale.
+
+**Burn Multiple: N/A** — Can't calculate Jan-to-Jan. Need net new ARR delta.
+
+**Magic Number: 2.96** — Excellent (>1.0 is good). For every $1 spent on S&M, you're adding $2.96 in ARR. Efficient GTM.
+
+**CAC Payback: 9.2 months** — Solid (target <12). You recover acquisition cost in under a year at 78% gross margin.
+
+*Note: Most recent data is from Dec-24 (2 months old).*
+
+📋 Actions (18):
+  1. [set_value] KPIs!A9 YoY Revenue Growth %
+  2. [set_formula] KPIs!B9 =(('P&L'!M4-'P&L'!B4)/'P&L'!B4)
+  3. [format_cell] KPIs!B9 
+  4. [set_value] KPIs!A10 EBITDA Margin %
+  5. [set_formula] KPIs!B10 ='P&L'!M25
+  6. [format_cell] KPIs!B10 
+  7. [set_formula] KPIs!B8 =B9+B10
+  8. [format_cell] KPIs!B8 
+  9. [set_value] KPIs!C8 
+  10. [set_value] KPIs!A11 Burn Multiple
+  11. [set_formula] KPIs!B11 =IF('P&L'!B30<0, ABS('P&L'!B30)/('P&L'!B4-'P&L'!B4*0), "N/A")
+  12. [format_cell] KPIs!B11 
+  13. [set_value] KPIs!A12 Magic Number
+  14. [set_formula] KPIs!B12 =(('P&L'!M4-'P&L'!B4)*12)/SUM('P&L'!B19:M19)
+  15. [format_cell] KPIs!B12 
+  16. [set_value] KPIs!A13 CAC Payback (months)
+  17. [set_formula] KPIs!B13 =Assumptions!B8/(Assumptions!B4*Assumptions!B9)
+  18. [format_cell] KPIs!B13 
+
+Summary: Calculated Rule of 40 (117%), Magic Number (2.96x), and CAC Payback (9.2mo) on KPIs tab
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #12: How-To Guide (Phase B)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "How would I add a new revenue stream to this model? Walk me through the steps."
+Expected: Step-by-step guide: add row in P&L, update Total Revenue formula, update COGS if applicable, propagate to Cash Flow and KPIs.
+────────────────────────────────────────────────────────────────────────────────
+Response (332 tokens out, 5540 tokens in, 10.6s):
+
+Adding a new revenue stream is a structural change that touches multiple tabs. Here's how to do it cleanly:
+
+**1. P&L Tab (rows 4-6):**
+- Insert a new row after row 5 (Services Revenue)
+- Label it (e.g., "Partner/Referral Revenue")
+- Blue font your monthly inputs or formula
+- Update Total Revenue formula to include the new row
+
+**2. Assumptions Tab:**
+- Add assumption rows for the new stream's drivers
+- Example: "Partner Revenue % of MRR" (blue input)
+- Add named ranges if you'll reference them often
+
+**3. KPIs Tab:**
+- Consider a new row showing the mix % of total revenue
+- Formula: `=NewStream/TotalRevenue`
+
+**4. Scenarios Tab:**
+- Add rows for how this stream behaves in Bull/Bear cases
+
+**Key decision:** Is this stream formulaic (e.g., 10% of subscription revenue) or hard-coded monthly? 
+- Formulaic = cleaner, fewer inputs, easier scenarios
+- Hard-coded = more flexible, more maintenance
+
+**Watch out for:**
+- Cell references in rows 7+ will shift down. Check that B7 still captures all revenue rows.
+- COGS: Does the new stream have different margin economics? If so, add a corresponding COGS line.
+
+Want me to implement a specific revenue stream? Tell me what it is and I'll wire it up.
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #15: Named Range Audit (Phase B)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Which key assumptions are missing named ranges? Create them following financial modeling conventions."
+Expected: Lists existing named ranges (Growth_Rate, Churn_Rate, ARR), identifies missing ones (ACV, Sales_Cycle, CAC, Gross_Margin_Target, NRR, etc.).
+────────────────────────────────────────────────────────────────────────────────
+Response (384 tokens out, 5537 tokens in, 6.9s):
+
+Added 8 missing named ranges. You already had Growth_Rate, Churn_Rate, and ARR — now all core SaaS assumptions are named for easy referencing across tabs.
+
+📋 Actions (8):
+  1. [add_named_range]  Starting_MRR
+  2. [add_named_range]  ACV
+  3. [add_named_range]  Sales_Cycle_Days
+  4. [add_named_range]  NRR
+  5. [add_named_range]  CAC
+  6. [add_named_range]  Gross_Margin_Target
+  7. [add_named_range]  Headcount_Growth_Rate
+  8. [add_named_range]  Cost_Per_Employee
+
+Summary: Created 8 named ranges for key assumptions
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #19: Unit Economics Deep Dive (Phase B)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Calculate CAC, LTV, and payback period from this model. Is the LTV:CAC ratio healthy? What levers would improve it?"
+Skill: unit_economics
+Expected: Uses CAC ($18K from Assumptions), ACV ($2,500/mo), churn (2.5%/mo), gross margin (78.6%). Computes LTV, payback, LTV:CAC ratio.
+────────────────────────────────────────────────────────────────────────────────
+Response (4096 tokens out, 5620 tokens in, 46.0s):
+
+
+
+I'll build a dedicated Unit Economics tab pulling from your existing assumptions. Here's my analysis and the build:
+
+**Key findings from the model:**
+
+- **CAC:** $18,000 (hard-coded in Assumptions!B8)
+- **ACV:** $30,000/yr ($2,500/mo × 12)
+- **Gross Margin per Customer:** $23,400/yr ($30,000 × 78% GM)
+- **Avg Customer Lifetime:** 40 months (1 / 2.5% monthly churn)
+- **LTV:** $78,000 ($2,500 × 0.78 GM × 40 months)
+- **LTV:CAC:** 4.3x ✅ Healthy (above 3:1 threshold)
+- **CAC Payback:** 9.2 months — solid for B2B SaaS
+
+**⚠️ Flags:**
+- NRR at 115% isn't factored into base LTV — with expansion revenue, effective LTV is even higher. I'll show both.
+- Most recent data is from Dec 2024, which is ~14 months old. Worth refreshing actuals.
+
+**Top levers to improve the ratio:**
+1. **Reduce churn** (biggest impact) — dropping from 2.5% → 2.0% extends lifetime from 40 → 50 months, pushing LTV to ~$97,500
+2. **Increase ACV** via upsell/pricing — directly lifts LTV
+3. **Lower CAC** — optimize S&M spend per new logo; Jan-24 S&M is $45K which implies ~2.5 new logos/month
+4. **Improve gross margin** — already strong at 78%, but hosting cost discipline helps
+
+```json
+{
+  "actions": [
+    { "type": "add_sheet", "sheetName": "Unit Economics" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A1", "value": "Unit Economics" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A1", "format": { "bold": true, "fontSize": 14 } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A2", "value": "As of model date: Jan-24 through Dec-24" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A2", "format": { "italic": true, "fontColor": "#666666" } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A4", "value": "Metric" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "B4", "value": "Value" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C4", "value": "Units" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D4", "value": "Notes" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A4", "format": { "bold": true } },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B4", "format": { "bold": true } },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "C4", "format": { "bold": true } },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "D4", "format": { "bold": true } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A5", "value": "--- Inputs (from Assumptions) ---" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A5", "format": { "bold": true, "fontColor": "#666666" } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A6", "value": "CAC" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B6", "formula": "=Assumptions!B8" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B6", "format": { "fontColor": "#008000", "numberFormat": "$#,##0" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C6", "value": "$" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A7", "value": "Avg Contract Value (Monthly)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B7", "formula": "=Assumptions!B4" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B7", "format": { "fontColor": "#008000", "numberFormat": "$#,##0" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C7", "value": "$/mo" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A8", "value": "ACV (Annual)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B8", "formula": "=B7*12" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B8", "format": { "fontColor": "#000000", "numberFormat": "$#,##0" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C8", "value": "$/yr" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A9", "value": "Monthly Logo Churn" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B9", "formula": "=Assumptions!B6" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B9", "format": { "fontColor": "#008000", "numberFormat": "0.0%" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C9", "value": "%" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A10", "value": "Gross Margin %" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B10", "formula": "=Assumptions!B9" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B10", "format": { "fontColor": "#008000", "numberFormat": "0.0%" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C10", "value": "%" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A11", "value": "Net Revenue Retention" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B11", "formula": "=Assumptions!B7" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B11", "format": { "fontColor": "#008000", "numberFormat": "0.0%" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C11", "value": "%" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A13", "value": "--- Base Unit Economics ---" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A13", "format": { "bold": true, "fontColor": "#666666" } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A14", "value": "Avg Customer Lifetime" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B14", "formula": "=1/B9" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B14", "format": { "fontColor": "#000000", "numberFormat": "0.0" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C14", "value": "months" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D14", "value": "= 1 / monthly churn" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A15", "value": "Gross Margin per Customer (Monthly)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B15", "formula": "=B7*B10" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B15", "format": { "fontColor": "#000000", "numberFormat": "$#,##0" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C15", "value": "$/mo" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A16", "value": "Gross Margin per Customer (Annual)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B16", "formula": "=B15*12" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B16", "format": { "fontColor": "#000000", "numberFormat": "$#,##0" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C16", "value": "$/yr" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A17", "value": "LTV (Base — no expansion)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B17", "formula": "=B15*B14" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B17", "format": { "fontColor": "#000000", "numberFormat": "$#,##0", "bold": true } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C17", "value": "$" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D17", "value": "GM/mo × lifetime months" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A19", "value": "--- NRR-Adjusted Unit Economics ---" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A19", "format": { "bold": true, "fontColor": "#666666" } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A20", "value": "Monthly Net Revenue Rate" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B20", "formula": "=B11^(1/12)" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B20", "format": { "fontColor": "#000000", "numberFormat": "0.000%" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C20", "value": "%" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D20", "value": "NRR annualized → monthly" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A21", "value": "LTV (NRR-Adjusted)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B21", "formula": "=IF(B9>(B20-1), B15/(B9-(B20-1)), B15*120)" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B21", "format": { "fontColor": "#000000", "numberFormat": "$#,##0", "bold": true } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C21", "value": "$" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D21", "value": "GM / (churn - net expansion rate); capped at 10yr" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A23", "value": "--- Ratios & Payback ---" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A23", "format": { "bold": true, "fontColor": "#666666" } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A24", "value": "LTV:CAC (Base)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B24", "formula": "=B17/B6" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B24", "format": { "fontColor": "#000000", "numberFormat": "0.0\"x\"", "bold": true } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D24", "value": "Target: > 3.0x" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A25", "value": "LTV:CAC (NRR-Adjusted)" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B25", "formula": "=B21/B6" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B25", "format": { "fontColor": "#000000", "numberFormat": "0.0\"x\"", "bold": true } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A26", "value": "CAC Payback Period" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B26", "formula": "=B6/B15" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B26", "format": { "fontColor": "#000000", "numberFormat": "0.0", "bold": true } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "C26", "value": "months" },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D26", "value": "Target: < 12 months" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A27", "value": "CAC Payback as % of Lifetime" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B27", "formula": "=B26/B14" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "B27", "format": { "fontColor": "#000000", "numberFormat": "0.0%" } },
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "D27", "value": "Lower = more time earning profit" },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A29", "value": "--- Health Check ---" },
+    { "type": "format_cell", "sheet": "Unit Economics", "cell": "A29", "format": { "bold": true, "fontColor": "#666666" } },
+
+    { "type": "set_value", "sheet": "Unit Economics", "cell": "A30", "value": "LTV:CAC ≥ 3x?" },
+    { "type": "set_formula", "sheet": "Unit Economics", "cell": "B30", "formula": "=IF(B24>=3,\"✅ PASS\",\"❌ FAIL\")" },
+
+    { "
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #5: KPI Dashboard Build (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Build a KPI dashboard row for Rule of 40 on the KPIs tab. Use the actual data from the model."
+Skill: kpi_dashboard
+Expected: Returns set_formula action(s) for KPIs!B8 computing Rule of 40 = revenue growth % + EBITDA margin. May format the cell.
+────────────────────────────────────────────────────────────────────────────────
+Response (1872 tokens out, 5607 tokens in, 17.6s):
+
+Rule of 40 calculated as YoY MRR growth + EBITDA margin. Formula: ((Dec MRR - Current Month MRR) / Current Month MRR) + EBITDA Margin%. Cross-tab refs in green.
+
+📋 Actions (24):
+  1. [set_formula] KPIs!B8 =(('P&L'!M4-'P&L'!B4)/'P&L'!B4)+'P&L'!M25
+  2. [set_formula] KPIs!C8 =(('P&L'!M4-'P&L'!C4)/'P&L'!C4)+'P&L'!M25
+  3. [set_formula] KPIs!D8 =(('P&L'!M4-'P&L'!D4)/'P&L'!D4)+'P&L'!M25
+  4. [set_formula] KPIs!E8 =(('P&L'!M4-'P&L'!E4)/'P&L'!E4)+'P&L'!M25
+  5. [set_formula] KPIs!F8 =(('P&L'!M4-'P&L'!F4)/'P&L'!F4)+'P&L'!M25
+  6. [set_formula] KPIs!G8 =(('P&L'!M4-'P&L'!G4)/'P&L'!G4)+'P&L'!M25
+  7. [set_formula] KPIs!H8 =(('P&L'!M4-'P&L'!H4)/'P&L'!H4)+'P&L'!M25
+  8. [set_formula] KPIs!I8 =(('P&L'!M4-'P&L'!I4)/'P&L'!I4)+'P&L'!M25
+  9. [set_formula] KPIs!J8 =(('P&L'!M4-'P&L'!J4)/'P&L'!J4)+'P&L'!M25
+  10. [set_formula] KPIs!K8 =(('P&L'!M4-'P&L'!K4)/'P&L'!K4)+'P&L'!M25
+  11. [set_formula] KPIs!L8 =(('P&L'!M4-'P&L'!L4)/'P&L'!L4)+'P&L'!M25
+  12. [set_formula] KPIs!M8 =(('P&L'!M4-'P&L'!M4)/'P&L'!M4)+'P&L'!M25
+  13. [format_cell] KPIs!B8 
+  14. [format_cell] KPIs!C8 
+  15. [format_cell] KPIs!D8 
+  16. [format_cell] KPIs!E8 
+  17. [format_cell] KPIs!F8 
+  18. [format_cell] KPIs!G8 
+  19. [format_cell] KPIs!H8 
+  20. [format_cell] KPIs!I8 
+  21. [format_cell] KPIs!J8 
+  22. [format_cell] KPIs!K8 
+  23. [format_cell] KPIs!L8 
+  24. [format_cell] KPIs!M8 
+
+Summary: Added Rule of 40 formulas across all 12 months on KPIs tab
+
+⚠ Parse errors: Invalid action type: delete_value
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #6: Scenario Model Toggle (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Wire up the Scenarios tab so I can toggle between Base, Bull, and Bear cases and it flows through to the P&L."
+Skill: scenario_modeling
+Expected: Actions to: add a scenario selector cell, update Assumptions formulas to reference scenario values, or create named ranges per scenario.
+────────────────────────────────────────────────────────────────────────────────
+Response (2828 tokens out, 5633 tokens in, 30.1s):
+
+Wired up the scenario engine. Here's what changed:
+
+**Scenarios tab** — Added `Scenario_Toggle` named range at B5 (1=Base, 2=Bull, 3=Bear). Added NRR and headcount growth rows to complete the scenario matrix.
+
+**Assumptions tab** — Four cells now pull from Scenarios via SWITCH():
+- **B3** Growth Rate (8% / 12% / 4%)
+- **B6** Churn Rate (2.5% / 1.5% / 4.5%)
+- **B7** NRR (115% / 125% / 105%)
+- **B10** Headcount Growth (5% / 8% / 2%)
+
+These were previously hard-coded inputs — now they're green cross-tab references. Since the P&L already references `Assumptions!B3` for subscription revenue growth, changing the toggle in Scenarios!B5 will cascade through the entire P&L automatically.
+
+**To use:** Change Scenarios!B5 to 1, 2, or 3. The label in B10 confirms which scenario is active.
+
+📋 Actions (48):
+  1. [set_value] Scenarios!A5 Active Scenario
+  2. [set_value] Scenarios!B5 1
+  3. [format_cell] Scenarios!B5 
+  4. [set_value] Scenarios!C5 ← 1=Base, 2=Bull, 3=Bear
+  5. [format_cell] Scenarios!C5 
+  6. [add_named_range]  Scenario_Toggle
+  7. [set_value] Scenarios!A7 Net Revenue Retention
+  8. [set_value] Scenarios!B7 1.15
+  9. [set_value] Scenarios!C7 1.25
+  10. [set_value] Scenarios!D7 1.05
+  11. [set_value] Scenarios!A8 Headcount Growth Rate
+  12. [set_value] Scenarios!B8 0.05
+  13. [set_value] Scenarios!C8 0.08
+  14. [set_value] Scenarios!D8 0.02
+  15. [format_cell] Scenarios!A5 
+  16. [format_cell] Scenarios!A7 
+  17. [format_cell] Scenarios!A8 
+  18. [format_cell] Scenarios!B7 
+  19. [format_cell] Scenarios!C7 
+  20. [format_cell] Scenarios!D7 
+  21. [format_cell] Scenarios!B8 
+  22. [format_cell] Scenarios!C8 
+  23. [format_cell] Scenarios!D8 
+  24. [format_cell] Scenarios!B2 
+  25. [format_cell] Scenarios!C2 
+  26. [format_cell] Scenarios!D2 
+  27. [format_cell] Scenarios!B3 
+  28. [format_cell] Scenarios!C3 
+  29. [format_cell] Scenarios!D3 
+  30. [set_formula] Assumptions!B3 =SWITCH(Scenario_Toggle, 1, Scenarios!B2, 2, Scenarios!C2, 3, Scenarios!D2)
+  31. [format_cell] Assumptions!B3 
+  32. [set_formula] Assumptions!B6 =SWITCH(Scenario_Toggle, 1, Scenarios!B3, 2, Scenarios!C3, 3, Scenarios!D3)
+  33. [format_cell] Assumptions!B6 
+  34. [set_formula] Assumptions!B7 =SWITCH(Scenario_Toggle, 1, Scenarios!B7, 2, Scenarios!C7, 3, Scenarios!D7)
+  35. [format_cell] Assumptions!B7 
+  36. [set_formula] Assumptions!B10 =SWITCH(Scenario_Toggle, 1, Scenarios!B8, 2, Scenarios!C8, 3, Scenarios!D8)
+  37. [format_cell] Assumptions!B10 
+  38. [set_value] Scenarios!A10 Active Scenario Label
+  39. [set_formula] Scenarios!B10 =SWITCH(Scenario_Toggle, 1, "Base", 2, "Bull", 3, "Bear")
+  40. [format_cell] Scenarios!B10 
+  41. [set_value] Assumptions!D3 ← Scenario-driven
+  42. [format_cell] Assumptions!D3 
+  43. [set_value] Assumptions!D6 ← Scenario-driven
+  44. [format_cell] Assumptions!D6 
+  45. [set_value] Assumptions!D7 ← Scenario-driven
+  46. [format_cell] Assumptions!D7 
+  47. [set_value] Assumptions!D10 ← Scenario-driven
+  48. [format_cell] Assumptions!D10 
+
+Summary: Created Scenario_Toggle named range, wired 4 key assumptions to SWITCH() formulas pulling from Scenarios tab, added NRR and headcount growth to scenario matrix
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #8: Cash Flow Forecast (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Build a 13-week cash flow forecast tab based on the P&L data."
+Skill: cash_flow_forecast
+Expected: Actions to create a new sheet with weekly cash flow projections derived from monthly P&L data. Should include beginning/ending cash.
+────────────────────────────────────────────────────────────────────────────────
+Response (4096 tokens out, 5620 tokens in, 39.0s):
+
+
+
+Looking at this model, the P&L has monthly data through Dec-24 — that's **14 months old**. I'll build a 13-week cash flow forecast projecting forward from the most recent actuals (Dec-24), converting monthly run-rates to weekly granularity.
+
+**Approach:**
+- Waterfall structure: Beginning Cash → Inflows → Outflows → Net Change → Ending Cash
+- Weekly columns (W1–W13) starting Jan 2025
+- Inflows derived from Dec-24 subscription + services revenue (weekly = monthly ÷ 4.33)
+- Outflows from COGS + OpEx, with growth assumptions applied
+- Runway calculation with red highlighting below 8 weeks (< 2 months)
+
+```json
+{
+  "actions": [
+    { "type": "add_sheet", "sheetName": "13-Week Cash Flow" },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A1", "value": "13-Week Cash Flow Forecast" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "A1", "format": { "bold": true, "fontSize": 14 } },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A2", "value": "Projected from Dec-24 actuals (weekly granularity)" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "A2", "format": { "italic": true, "fontColor": "#666666" } },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A4", "value": "Assumptions" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "A4", "format": { "bold": true, "underline": true } },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A5", "value": "Weekly Growth Factor" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "B5", "formula": "=(1+Assumptions!B3)^(1/4.33)-1" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "B5", "format": { "fontColor": "#008000", "numberFormat": "0.00%" } },
+    { "type": "add_named_range", "rangeName": "Weekly_Growth", "rangeA1": "13-Week Cash Flow!B5" },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A6", "value": "Weekly OpEx Growth Factor" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "B6", "formula": "=(1+Assumptions!B10)^(1/4.33)-1" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "B6", "format": { "fontColor": "#008000", "numberFormat": "0.00%" } },
+    { "type": "add_named_range", "rangeName": "Weekly_OpEx_Growth", "rangeA1": "13-Week Cash Flow!B6" },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A7", "value": "Collections Lag (% collected in week)" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "B7", "value": 0.95 },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "B7", "format": { "fontColor": "#0000FF", "numberFormat": "0%" } },
+    { "type": "add_named_range", "rangeName": "Collection_Rate", "rangeA1": "13-Week Cash Flow!B7" },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A8", "value": "Starting Cash (from Dec-24)" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "B8", "formula": "='Cash Flow'!B3+'Cash Flow'!B5*12" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "B8", "format": { "fontColor": "#008000", "numberFormat": "#,##0" } },
+    { "type": "add_named_range", "rangeName": "Starting_Cash_13W", "rangeA1": "13-Week Cash Flow!B8" },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A10", "value": "" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "B10", "value": "Week 1" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "C10", "value": "Week 2" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "D10", "value": "Week 3" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "E10", "value": "Week 4" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "F10", "value": "Week 5" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "G10", "value": "Week 6" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "H10", "value": "Week 7" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "I10", "value": "Week 8" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "J10", "value": "Week 9" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "K10", "value": "Week 10" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "L10", "value": "Week 11" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "M10", "value": "Week 12" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "N10", "value": "Week 13" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "O10", "value": "13-Wk Total" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "B10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "C10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "D10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "E10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "F10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "G10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "H10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "I10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "J10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "K10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "L10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "M10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "N10", "format": { "bold": true, "backgroundColor": "#D9E1F2" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "O10", "format": { "bold": true, "backgroundColor": "#B4C6E7" } },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A11", "value": "Week Ending" },
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "B11", "value": "2025-01-10" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "C11", "formula": "=B11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "D11", "formula": "=C11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "E11", "formula": "=D11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "F11", "formula": "=E11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "G11", "formula": "=F11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "H11", "formula": "=G11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "I11", "formula": "=H11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "J11", "formula": "=I11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "K11", "formula": "=J11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "L11", "formula": "=K11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "M11", "formula": "=L11+7" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "N11", "formula": "=M11+7" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "B11", "format": { "numberFormat": "MMM dd", "fontColor": "#0000FF" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "C11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "D11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "E11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "F11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "G11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "H11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "I11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "J11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "K11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "L11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "M11", "format": { "numberFormat": "MMM dd" } },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "N11", "format": { "numberFormat": "MMM dd" } },
+
+    { "type": "set_value", "sheet": "13-Week Cash Flow", "cell": "A13", "value": "BEGINNING CASH" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "A13", "format": { "bold": true, "backgroundColor": "#E2EFDA" } },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "B13", "formula": "=Starting_Cash_13W" },
+    { "type": "format_cell", "sheet": "13-Week Cash Flow", "cell": "B13", "format": { "fontColor": "#008000", "numberFormat": "#,##0", "bold": true, "backgroundColor": "#E2EFDA" } },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "C13", "formula": "=B26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "D13", "formula": "=C26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "E13", "formula": "=D26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "F13", "formula": "=E26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "G13", "formula": "=F26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "H13", "formula": "=G26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "I13", "formula": "=H26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "J13", "formula": "=I26" },
+    { "type": "set_formula", "sheet": "13-Week Cash Flow", "cell": "K13", "formula": "=J26" },
+    { "type": "set_formula", "sheet": "13-
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #9: Budget vs Actual (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Create a budget vs actual comparison. Use the Assumptions as budget and the P&L actuals. Show variance and % variance."
+Skill: budget_vs_actual
+Expected: Actions to create comparison rows/tab showing budget (from assumptions), actual (P&L), dollar variance, and % variance.
+────────────────────────────────────────────────────────────────────────────────
+Response (4096 tokens out, 5613 tokens in, 35.2s):
+
+```json
+{
+  "actions": [
+    {
+      "type": "add_sheet",
+      "sheetName": "Budget vs Actual"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A1",
+      "value": "Line Item"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "A1",
+      "format": { "bold": true, "backgroundColor": "#f3f3f3" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "B1",
+      "value": "Budget (Dec-24)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B1",
+      "format": { "bold": true, "backgroundColor": "#f3f3f3" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "C1",
+      "value": "Actual (Dec-24)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "C1",
+      "format": { "bold": true, "backgroundColor": "#f3f3f3" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "D1",
+      "value": "$ Variance"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "D1",
+      "format": { "bold": true, "backgroundColor": "#f3f3f3" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "E1",
+      "value": "% Variance"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "E1",
+      "format": { "bold": true, "backgroundColor": "#f3f3f3" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "F1",
+      "value": "Commentary"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "F1",
+      "format": { "bold": true, "backgroundColor": "#f3f3f3" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A3",
+      "value": "Revenue"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "A3",
+      "format": { "bold": true }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A4",
+      "value": "Subscription Revenue"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "B4",
+      "formula": "='P&L'!B4*(1+Assumptions!B3)^11"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B4",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "C4",
+      "formula": "='P&L'!M4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "C4",
+      "format": { "fontColor": "#008000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "D4",
+      "formula": "=C4-B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "D4",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "E4",
+      "formula": "=IF(B4<>0,D4/B4,0)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "E4",
+      "format": { "fontColor": "#000000", "numberFormat": "0.0%" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A5",
+      "value": "Services Revenue"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "B5",
+      "value": 16500
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B5",
+      "format": { "fontColor": "#0000FF", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "C5",
+      "formula": "='P&L'!M5"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "C5",
+      "format": { "fontColor": "#008000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "D5",
+      "formula": "=C5-B5"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "D5",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "E5",
+      "formula": "=IF(B5<>0,D5/B5,0)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "E5",
+      "format": { "fontColor": "#000000", "numberFormat": "0.0%" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A7",
+      "value": "Total Revenue"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "A7",
+      "format": { "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "B7",
+      "formula": "=B4+B5"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B7",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0", "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "C7",
+      "formula": "='P&L'!M7"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "C7",
+      "format": { "fontColor": "#008000", "numberFormat": "$#,##0", "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "D7",
+      "formula": "=C7-B7"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "D7",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0", "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "E7",
+      "formula": "=IF(B7<>0,D7/B7,0)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "E7",
+      "format": { "fontColor": "#000000", "numberFormat": "0.0%", "bold": true }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A9",
+      "value": "Cost of Revenue"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "A9",
+      "format": { "bold": true }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A10",
+      "value": "Total COGS"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "B10",
+      "formula": "=B7*(1-Assumptions!B9)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B10",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "C10",
+      "formula": "='P&L'!M13"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "C10",
+      "format": { "fontColor": "#008000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "D10",
+      "formula": "=C10-B10"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "D10",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "E10",
+      "formula": "=IF(B10<>0,D10/B10,0)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "E10",
+      "format": { "fontColor": "#000000", "numberFormat": "0.0%" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A12",
+      "value": "Gross Profit"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "A12",
+      "format": { "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "B12",
+      "formula": "=B7-B10"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B12",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0", "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "C12",
+      "formula": "='P&L'!M15"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "C12",
+      "format": { "fontColor": "#008000", "numberFormat": "$#,##0", "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "D12",
+      "formula": "=C12-B12"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "D12",
+      "format": { "fontColor": "#000000", "numberFormat": "$#,##0", "bold": true }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "E12",
+      "formula": "=IF(B12<>0,D12/B12,0)"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "E12",
+      "format": { "fontColor": "#000000", "numberFormat": "0.0%", "bold": true }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A13",
+      "value": "Gross Margin %"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "B13",
+      "formula": "=B12/B7"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B13",
+      "format": { "fontColor": "#000000", "numberFormat": "0.0%" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "C13",
+      "formula": "='P&L'!M16"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "C13",
+      "format": { "fontColor": "#008000", "numberFormat": "0.0%" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Budget vs Actual",
+      "cell": "D13",
+      "formula": "=C13-B13"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "D13",
+      "format": { "fontColor": "#000000", "numberFormat": "0.0%" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A15",
+      "value": "Operating Expenses"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "A15",
+      "format": { "bold": true }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "A16",
+      "value": "Sales & Marketing"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Budget vs Actual",
+      "cell": "B16",
+      "value": 45000
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Budget vs Actual",
+      "cell": "B16",
+      "format": { "fontColor": "#0000FF", "numberFormat": "$#
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #11: Revenue Waterfall (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Create a revenue waterfall showing: Beginning MRR → New → Expansion → Churn → Ending MRR for each month."
+Skill: revenue_waterfall
+Expected: Actions to add waterfall structure. Uses MRR data and churn rate to decompose revenue movements.
+────────────────────────────────────────────────────────────────────────────────
+Response (4096 tokens out, 5593 tokens in, 34.5s):
+
+```json
+{
+  "actions": [
+    {
+      "type": "add_sheet",
+      "sheetName": "Revenue Waterfall"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "A1",
+      "value": "Component"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "B1",
+      "value": "Jan-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "C1",
+      "value": "Feb-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "D1",
+      "value": "Mar-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "E1",
+      "value": "Apr-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "F1",
+      "value": "May-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "G1",
+      "value": "Jun-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "H1",
+      "value": "Jul-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "I1",
+      "value": "Aug-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "J1",
+      "value": "Sep-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "K1",
+      "value": "Oct-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "L1",
+      "value": "Nov-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "M1",
+      "value": "Dec-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "A3",
+      "value": "Beginning MRR"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Revenue Waterfall",
+      "cell": "A3",
+      "format": {"bold": true}
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "B3",
+      "formula": "='P&L'!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Revenue Waterfall",
+      "cell": "B3",
+      "format": {"fontColor": "#008000"}
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "C3",
+      "formula": "=B8"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Revenue Waterfall",
+      "cell": "C3",
+      "format": {"fontColor": "#000000"}
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "D3",
+      "formula": "=C8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "E3",
+      "formula": "=D8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "F3",
+      "formula": "=E8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "G3",
+      "formula": "=F8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "H3",
+      "formula": "=G8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "I3",
+      "formula": "=H8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "J3",
+      "formula": "=I8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "K3",
+      "formula": "=J8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "L3",
+      "formula": "=K8"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "M3",
+      "formula": "=L8"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "A4",
+      "value": "New MRR"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "B4",
+      "formula": "=B3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Revenue Waterfall",
+      "cell": "B4",
+      "format": {"fontColor": "#000000"}
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "C4",
+      "formula": "=C3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "D4",
+      "formula": "=D3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "E4",
+      "formula": "=E3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "F4",
+      "formula": "=F3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "G4",
+      "formula": "=G3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "H4",
+      "formula": "=H3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "I4",
+      "formula": "=I3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "J4",
+      "formula": "=J3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "K4",
+      "formula": "=K3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "L4",
+      "formula": "=L3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "M4",
+      "formula": "=M3*Assumptions!B3*0.65"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "A5",
+      "value": "Expansion MRR"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "B5",
+      "formula": "=B3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "C5",
+      "formula": "=C3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "D5",
+      "formula": "=D3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "E5",
+      "formula": "=E3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "F5",
+      "formula": "=F3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "G5",
+      "formula": "=G3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "H5",
+      "formula": "=H3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "I5",
+      "formula": "=I3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "J5",
+      "formula": "=J3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "K5",
+      "formula": "=K3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "L5",
+      "formula": "=L3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "M5",
+      "formula": "=M3*(Assumptions!B7-1)*0.85"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "A6",
+      "value": "Churn MRR"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "B6",
+      "formula": "=B3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "C6",
+      "formula": "=C3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "D6",
+      "formula": "=D3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "E6",
+      "formula": "=E3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "F6",
+      "formula": "=F3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "G6",
+      "formula": "=G3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "H6",
+      "formula": "=H3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "I6",
+      "formula": "=I3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "J6",
+      "formula": "=J3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "K6",
+      "formula": "=K3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "L6",
+      "formula": "=L3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "M6",
+      "formula": "=M3*Assumptions!B6*-1"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Revenue Waterfall",
+      "cell": "A7",
+      "value": "Contraction MRR"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "B7",
+      "formula": "=B3*(Assumptions!B7-1)*0.15*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "C7",
+      "formula": "=C3*(Assumptions!B7-1)*0.15*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "D7",
+      "formula": "=D3*(Assumptions!B7-1)*0.15*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "E7",
+      "formula": "=E3*(Assumptions!B7-1)*0.15*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "F7",
+      "formula": "=F3*(Assumptions!B7-1)*0.15*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "G7",
+      "formula": "=G3*(Assumptions!B7-1)*0.15*-1"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Revenue Waterfall",
+      "cell": "H7",
+      "formula": "=H3*(Assumptions!B7-1)*0.15*-1"
+    },
+    {
+      "type": "set_formula",
+      "
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #16: Create Named Ranges (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Create named ranges for all the key assumptions that don't have them yet: ACV, Sales_Cycle, CAC, Gross_Margin_Target, NRR, Headcount_Growth."
+Expected: Returns add_named_range actions for each. Maps to correct cells in Assumptions tab.
+────────────────────────────────────────────────────────────────────────────────
+Response (351 tokens out, 5632 tokens in, 6.4s):
+
+Six named ranges created for the remaining key assumptions. Combined with the existing `Growth_Rate`, `Churn_Rate`, and `ARR`, every core input now has a named range — which means the Unit Economics tab I'll build next can reference these cleanly instead of raw cell addresses.
+
+📋 Actions (6):
+  1. [add_named_range]  ACV
+  2. [add_named_range]  Sales_Cycle
+  3. [add_named_range]  CAC
+  4. [add_named_range]  Gross_Margin_Target
+  5. [add_named_range]  NRR
+  6. [add_named_range]  Headcount_Growth
+
+Summary: Added 6 named ranges: ACV, Sales_Cycle, CAC, Gross_Margin_Target, NRR, Headcount_Growth
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #17: Hard-Coded Quarterly Snapshot (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Create a 'Q4 Report' tab that's a clean, hard-coded snapshot of Q4 actuals. No formulas — just numbers. Safe to export to Excel."
+Expected: Actions to add_sheet 'Q4 Report', then set_value (not set_formula) for Oct-Dec actuals from P&L. Labeled as snapshot.
+────────────────────────────────────────────────────────────────────────────────
+Response (2077 tokens out, 5561 tokens in, 20.9s):
+
+Q4 Report tab created. Hard-coded Oct/Nov/Dec actuals + totals. All values, no formulas. Export-safe.
+
+📋 Actions (40):
+  1. [add_sheet]  Q4 Report
+  2. [set_value] Q4 Report!A1 Q4 2024 Actuals — Acme Corp
+  3. [format_cell] Q4 Report!A1 
+  4. [set_value] Q4 Report!A2 Export-ready snapshot — no formulas
+  5. [format_cell] Q4 Report!A2 
+  6. [set_value] Q4 Report!A4 
+  7. [set_value] Q4 Report!B4 Oct-24
+  8. [set_value] Q4 Report!C4 Nov-24
+  9. [set_value] Q4 Report!D4 Dec-24
+  10. [set_value] Q4 Report!E4 Q4 Total
+  11. [format_cell] Q4 Report!B4:E4 
+  12. [set_value] Q4 Report!A6 Revenue
+  13. [format_cell] Q4 Report!A6 
+  14. [set_value] Q4 Report!A7 Subscription Revenue
+  15. [set_value] Q4 Report!B7 249875
+  16. [set_value] Q4 Report!C7 269865
+  17. [set_value] Q4 Report!D7 291454
+  18. [set_value] Q4 Report!E7 811194
+  19. [set_value] Q4 Report!A8 Services Revenue
+  20. [set_value] Q4 Report!B8 19000
+  21. [set_value] Q4 Report!C8 14000
+  22. [set_value] Q4 Report!D8 22000
+  23. [set_value] Q4 Report!E8 55000
+  24. [set_value] Q4 Report!A9 Total Revenue
+  25. [set_value] Q4 Report!B9 268875
+  26. [set_value] Q4 Report!C9 283865
+  27. [set_value] Q4 Report!D9 313454
+  28. [set_value] Q4 Report!E9 866194
+  29. [format_cell] Q4 Report!A9 
+  30. [format_cell] Q4 Report!B9:E9 
+  31. [set_value] Q4 Report!A11 Key Metrics
+  32. [format_cell] Q4 Report!A11 
+  33. [set_value] Q4 Report!A12 Ending ARR
+  34. [set_value] Q4 Report!D12 3497448
+  35. [set_value] Q4 Report!A13 Ending MRR
+  36. [set_value] Q4 Report!D13 291454
+  37. [set_value] Q4 Report!A15 Generated: 2026-02-10
+  38. [format_cell] Q4 Report!A15 
+  39. [format_cell] Q4 Report!B7:E9 
+  40. [format_cell] Q4 Report!D12:D13 
+
+Summary: Created Q4 2024 snapshot: revenue by month + ARR/MRR
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #20: Cohort Analysis (Phase C)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Build a cohort retention table. Assume each month's new customers equal the growth in subscription revenue divided by ACV."
+Skill: cohort_analysis
+Expected: Actions to create a new sheet with cohort grid. Rows = acquisition months, columns = months since acquisition. Uses churn rate.
+────────────────────────────────────────────────────────────────────────────────
+Response (4096 tokens out, 5597 tokens in, 32.5s):
+
+
+
+```json
+{
+  "actions": [
+    {
+      "type": "add_sheet",
+      "sheetName": "Cohort Retention"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A1",
+      "value": "Cohort Retention Analysis"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "A1",
+      "format": { "bold": true, "fontSize": 12 }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A3",
+      "value": "New Customers per Cohort"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "A3",
+      "format": { "bold": true, "underline": true }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A4",
+      "value": "Cohort"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "B4",
+      "value": "New Customers"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "C4",
+      "value": "M0"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "D4",
+      "value": "M1"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "E4",
+      "value": "M2"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "F4",
+      "value": "M3"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "G4",
+      "value": "M4"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "H4",
+      "value": "M5"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "I4",
+      "value": "M6"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "J4",
+      "value": "M7"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "K4",
+      "value": "M8"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "L4",
+      "value": "M9"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "M4",
+      "value": "M10"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "N4",
+      "value": "M11"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "A4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "C4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "D4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "E4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "F4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "G4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "H4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "I4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "J4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "K4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "L4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "M4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "N4",
+      "format": { "bold": true, "backgroundColor": "#D9E1F2" }
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A5",
+      "value": "Jan-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A6",
+      "value": "Feb-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A7",
+      "value": "Mar-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A8",
+      "value": "Apr-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A9",
+      "value": "May-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A10",
+      "value": "Jun-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A11",
+      "value": "Jul-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A12",
+      "value": "Aug-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A13",
+      "value": "Sep-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A14",
+      "value": "Oct-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A15",
+      "value": "Nov-24"
+    },
+    {
+      "type": "set_value",
+      "sheet": "Cohort Retention",
+      "cell": "A16",
+      "value": "Dec-24"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B5",
+      "formula": "='P&L'!B4/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B5",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B6",
+      "formula": "=('P&L'!C4-'P&L'!B4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B6",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B7",
+      "formula": "=('P&L'!D4-'P&L'!C4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B7",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B8",
+      "formula": "=('P&L'!E4-'P&L'!D4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B8",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B9",
+      "formula": "=('P&L'!F4-'P&L'!E4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B9",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B10",
+      "formula": "=('P&L'!G4-'P&L'!F4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B10",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B11",
+      "formula": "=('P&L'!H4-'P&L'!G4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B11",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B12",
+      "formula": "=('P&L'!I4-'P&L'!H4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B12",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B13",
+      "formula": "=('P&L'!J4-'P&L'!I4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B13",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B14",
+      "formula": "=('P&L'!K4-'P&L'!J4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B14",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B15",
+      "formula": "=('P&L'!L4-'P&L'!K4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B15",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "B16",
+      "formula": "=('P&L'!M4-'P&L'!L4)/Assumptions!B4"
+    },
+    {
+      "type": "format_cell",
+      "sheet": "Cohort Retention",
+      "cell": "B16",
+      "format": { "fontColor": "#008000" }
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "C5",
+      "formula": "=B5"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "D5",
+      "formula": "=C5*(1-Assumptions!$B$6)"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "E5",
+      "formula": "=D5*(1-Assumptions!$B$6)"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "F5",
+      "formula": "=E5*(1-Assumptions!$B$6)"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "G5",
+      "formula": "=F5*(1-Assumptions!$B$6)"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "H5",
+      "formula": "=G5*(1-Assumptions!$B$6)"
+    },
+    {
+      "type": "set_formula",
+      "sheet": "Cohort Retention",
+      "cell": "I5
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #10: Cleanup Mode (Phase D)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "Clean up this model. Fix the color coding (blue for inputs, black for formulas, green for cross-refs), freeze headers, and flag any orphaned formulas."
+Expected: Actions to format_cell for color coding. Should identify which cells need color changes based on their current role.
+────────────────────────────────────────────────────────────────────────────────
+Response (4008 tokens out, 5558 tokens in, 36.9s):
+
+Color-coded all cells. Flags:
+
+**Orphans:**
+- P&L C11: formula references B11 growth, but C12 (support costs) is missing
+- ARR only calculated in Jan & Dec (B8, M8) — Feb-Nov orphaned
+- Scenarios sheet not wired to model
+
+**Missing formulas:**
+- P&L row 11-35: only Jan populated, Feb-Dec blank
+- Cash Flow: only Jan column built
+- KPIs: only Jan column built
+
+Model is 8% complete — only Jan works.
+
+📋 Actions (76):
+  1. [format_cell] Assumptions!B2 
+  2. [format_cell] Assumptions!B3 
+  3. [format_cell] Assumptions!B4 
+  4. [format_cell] Assumptions!B5 
+  5. [format_cell] Assumptions!B6 
+  6. [format_cell] Assumptions!B7 
+  7. [format_cell] Assumptions!B8 
+  8. [format_cell] Assumptions!B9 
+  9. [format_cell] Assumptions!B10 
+  10. [format_cell] Assumptions!B11 
+  11. [format_cell] P&L!B4 
+  12. [format_cell] P&L!C4 
+  13. [format_cell] P&L!D4 
+  14. [format_cell] P&L!E4 
+  15. [format_cell] P&L!F4 
+  16. [format_cell] P&L!G4 
+  17. [format_cell] P&L!H4 
+  18. [format_cell] P&L!I4 
+  19. [format_cell] P&L!J4 
+  20. [format_cell] P&L!K4 
+  21. [format_cell] P&L!L4 
+  22. [format_cell] P&L!M4 
+  23. [format_cell] P&L!B5 
+  24. [format_cell] P&L!C5 
+  25. [format_cell] P&L!D5 
+  26. [format_cell] P&L!E5 
+  27. [format_cell] P&L!F5 
+  28. [format_cell] P&L!G5 
+  29. [format_cell] P&L!H5 
+  30. [format_cell] P&L!I5 
+  31. [format_cell] P&L!J5 
+  32. [format_cell] P&L!K5 
+  33. [format_cell] P&L!L5 
+  34. [format_cell] P&L!M5 
+  35. [format_cell] P&L!B7 
+  36. [format_cell] P&L!C7 
+  37. [format_cell] P&L!D7 
+  38. [format_cell] P&L!E7 
+  39. [format_cell] P&L!F7 
+  40. [format_cell] P&L!G7 
+  41. [format_cell] P&L!H7 
+  42. [format_cell] P&L!I7 
+  43. [format_cell] P&L!J7 
+  44. [format_cell] P&L!K7 
+  45. [format_cell] P&L!L7 
+  46. [format_cell] P&L!M7 
+  47. [format_cell] P&L!B8 
+  48. [format_cell] P&L!M8 
+  49. [format_cell] P&L!B11 
+  50. [format_cell] P&L!C11 
+  51. [format_cell] P&L!B12 
+  52. [format_cell] P&L!B13 
+  53. [format_cell] P&L!B15 
+  54. [format_cell] P&L!B16 
+  55. [format_cell] P&L!B19 
+  56. [format_cell] P&L!B20 
+  57. [format_cell] P&L!B21 
+  58. [format_cell] P&L!B22 
+  59. [format_cell] P&L!B24 
+  60. [format_cell] P&L!B25 
+  61. [format_cell] P&L!B27 
+  62. [format_cell] P&L!B28 
+  63. [format_cell] P&L!B30 
+  64. [format_cell] P&L!B33 
+  65. [format_cell] P&L!B34 
+  66. [format_cell] P&L!B35 
+  67. [format_cell] Cash Flow!B3 
+  68. [format_cell] Cash Flow!B5 
+  69. [format_cell] Cash Flow!B7 
+  70. [format_cell] Cash Flow!B9 
+  71. [format_cell] KPIs!B2 
+  72. [format_cell] KPIs!B3 
+  73. [format_cell] KPIs!B4 
+  74. [format_cell] KPIs!B5 
+  75. [format_cell] KPIs!B6 
+  76. [format_cell] KPIs!B8 
+
+Summary: Applied color coding across all sheets and flagged incomplete build
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+DEMO #18: @CRUNCHY Comment Commands (Phase D)
+────────────────────────────────────────────────────────────────────────────────
+Prompt: "@CRUNCHY: EXPLAIN THIS SECTION — I'm looking at the OpEx section (rows 18-22) of the P&L. Break down what each line item represents and how they relate."
+Expected: Explains S&M, R&D, G&A categories. References specific cells. Notes they're all hard-coded inputs (no formula growth).
+────────────────────────────────────────────────────────────────────────────────
+Response (321 tokens out, 5612 tokens in, 8.2s):
+
+**OpEx Breakdown (P&L rows 18-22):**
+
+• **Sales & Marketing (B19: $45K)** — Customer acquisition costs: ads, SDRs, events, marketing tools. Hard-coded input.
+
+• **R&D (B20: $62K)** — Product development: engineering salaries, infrastructure, tooling. Hard-coded input.
+
+• **G&A (B21: $25K)** — Corporate overhead: finance, HR, legal, office costs. Hard-coded input.
+
+• **Total OpEx (B22: $132K)** — Sum formula `=B19+B20+B21`. Flows into EBITDA calc at B24.
+
+**Structure note:** All three OpEx lines are blue (hard-coded). Consider tying R&D to headcount (B33: 8 engineers) and avg cost per employee (Assumptions!B11: $12.5K/mo). Right now, $62K ÷ 8 = $7.75K/person — below the $12.5K assumption.
+
+**Most recent actuals:** Jan-24 (24 months ago).
+
+Summary: Explained OpEx structure and flagged R&D cost inconsistency
+════════════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════════════
+SUMMARY
+────────────────────────────────────────────────────────────────────────────────
+Demos run: 20
+Passed: 20 | Errors: 0
+Total tokens: 111,617 in / 35,780 out
+Total time: 397.2s
+Avg per demo: 19.9s
+Estimated cost: ~$4.36 (Sonnet pricing)
+════════════════════════════════════════════════════════════════════════════════
+

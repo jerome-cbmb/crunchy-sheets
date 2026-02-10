@@ -54,6 +54,12 @@ function serializeWorkbookState(activeSheetOverride) {
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
  * @return {Object} Sheet state.
  */
+function _safeValue(val) {
+  if (val instanceof Date) return val.toISOString();
+  if (typeof val === 'number' && !isFinite(val)) return null;
+  return val;
+}
+
 function _serializeSheet(sheet) {
   var dataRange = sheet.getDataRange();
   var values = dataRange.getValues();
@@ -78,9 +84,9 @@ function _serializeSheet(sheet) {
 
       if (formula) {
         cell.formula = formula;
-        cell.value = val; // computed value
+        cell.value = _safeValue(val);
       } else {
-        cell.value = val;
+        cell.value = _safeValue(val);
       }
 
       // Detect cell role from font color (financial analyst convention)
@@ -176,9 +182,9 @@ function _serializeSheetSummary(sheet) {
 
       if (formula) {
         cell.formula = formula;
-        cell.value = val;
+        cell.value = _safeValue(val);
       } else {
-        cell.value = val;
+        cell.value = _safeValue(val);
       }
 
       var color = fontColors[r][c];

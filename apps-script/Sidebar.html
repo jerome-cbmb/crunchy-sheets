@@ -799,6 +799,11 @@
      * Uses fetch() + ReadableStream for progressive rendering.
      */
     async function streamAnalysis(payload) {
+      if (!payload) {
+        setLoading(false);
+        addMessage('⚠ Could not read workbook. Try closing and re-opening the sidebar.', 'system');
+        return;
+      }
       var msgDiv = createStreamingMessage();
 
       try {

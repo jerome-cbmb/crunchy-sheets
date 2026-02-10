@@ -12,7 +12,7 @@ Sidebar (HTML/JS)  →  Apps Script (.gs)  →  Cloud Function /analyze  →  Cl
 Sidebar preview  ←  Apps Script applyActions()  ←  action-parser validates  ←
 ```
 
-**RLM (Runtime Language Model):** The entire workbook is serialized into a single JSON state string on every request. No RAG, no chunking, no repeated lookups. Claude reasons over full workbook structure in context.
+**RLM (Runtime Language Model):** The workbook is serialized into a single JSON state string on every request using **tiered serialization**: the active sheet gets full cell data, other sheets get headers + bookend rows (first 3 + last 3, capped at 8 columns). No RAG, no chunking, no repeated lookups. Claude reasons over full active sheet + structural summaries of all other tabs.
 
 ## Data Flow (happy path)
 
@@ -182,8 +182,10 @@ RLS enabled on all tables, service role bypasses.
 
 ## Key Design Decisions
 
-- **No RAG:** Full workbook in context every time. Simpler, more accurate, higher token cost.
+- **Tiered serialization:** Active sheet = full cell data. Other sheets = headers + 3+3 bookend rows, capped at 8 columns. Hidden sheets skipped. Target: ~25-40K tokens for an 8-tab SaaS model. Token guard at 150K rejects oversized payloads before calling Claude.
+- **No RAG:** Single JSON state per request. Simpler, more accurate than chunking.
 - **Actions require confirmation:** Claude returns proposed actions → sidebar shows preview → user clicks "Apply All" before anything touches the spreadsheet.
 - **Skill routing is layered:** Explicit sidebar selection takes priority, then `[skill:xxx]` prefix, then keyword auto-detect, then default.
 - **Model selection per skill:** Opus for complex reasoning (cash flow, unit economics, cohorts, scenarios). Sonnet for fast analysis (variance, BvA, dashboard, categorization).
 - **Sheet type classification:** WorkbookState.gs auto-classifies tabs (assumptions, income_statement, balance_sheet, etc.) from name + header row patterns.
+- **Concise responses:** System prompt enforces sidebar-friendly brevity — short sentences, bullet points, no filler.

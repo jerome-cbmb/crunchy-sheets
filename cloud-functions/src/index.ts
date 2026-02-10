@@ -32,7 +32,8 @@ ff.http('analyze', async (req, res) => {
     res.status(200).json(result);
   } catch (err: any) {
     console.error('analyze error:', err);
-    res.status(500).json({ error: err.message || 'Internal error' });
+    const message = err.error?.error?.message || err.message || 'Internal error';
+    res.status(err.status || 500).json({ error: message });
   }
 });
 

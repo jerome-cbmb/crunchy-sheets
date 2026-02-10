@@ -20,22 +20,25 @@
  */
 function serializeWorkbookState() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var activeSheet = ss.getActiveSheet();
   var sheets = ss.getSheets();
 
   var state = {
     name: ss.getName(),
     id: ss.getId(),
-    url: ss.getUrl(),
-    locale: ss.getSpreadsheetLocale(),
-    timeZone: ss.getSpreadsheetTimeZone(),
+    activeSheet: activeSheet.getName(),
     namedRanges: _serializeNamedRanges(ss),
     sheets: [],
     serializedAt: new Date().toISOString(),
-    tokenEstimate: 0 // rough token count for the state string
+    tokenEstimate: 0
   };
 
   for (var i = 0; i < sheets.length; i++) {
-    var sheetState = _serializeSheet(sheets[i]);
+    if (sheets[i].isSheetHidden()) continue;
+    var isActive = (sheets[i].getName() === activeSheet.getName());
+    var sheetState = isActive
+      ? _serializeSheet(sheets[i])
+      : _serializeSheetSummary(sheets[i]);
     state.sheets.push(sheetState);
     state.tokenEstimate += sheetState._tokenEstimate || 0;
   }
@@ -54,7 +57,6 @@ function _serializeSheet(sheet) {
   var values = dataRange.getValues();
   var formulas = dataRange.getFormulas();
   var fontColors = dataRange.getFontColors();
-  var backgrounds = dataRange.getBackgrounds();
   var numRows = values.length;
   var numCols = numRows > 0 ? values[0].length : 0;
 
@@ -107,6 +109,103 @@ function _serializeSheet(sheet) {
   };
 
   return sheetState;
+}
+
+/**
+ * Serialize a lightweight summary of a non-active sheet.
+ * Includes headers (rows 1-2) + first 3 and last 3 data rows ("bookends"),
+ * capped at 8 columns (row labels + enough data to see the pattern).
+ * Claude can request full detail by having the user switch to that tab.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
+ * @return {Object} Sheet summary state.
+ */
+function _serializeSheetSummary(sheet) {
+  var dataRange = sheet.getDataRange();
+  var values = dataRange.getValues();
+  var formulas = dataRange.getFormulas();
+  var fontColors = dataRange.getFontColors();
+  var numRows = values.length;
+  var numCols = numRows > 0 ? values[0].length : 0;
+
+  // Cap columns: row labels (A) + enough data cols to see the pattern
+  var MAX_SUMMARY_COLS = 8;
+  var cappedCols = Math.min(numCols, MAX_SUMMARY_COLS);
+
+  // Determine which rows to include:
+  // Header rows (0-1), first 3 data rows, last 3 data rows
+  var headerCount = Math.min(2, numRows);
+  var dataStartRow = headerCount;
+  var totalDataRows = numRows - dataStartRow;
+
+  var rowsToInclude = {};
+
+  // Always include header rows
+  for (var h = 0; h < headerCount; h++) {
+    rowsToInclude[h] = true;
+  }
+
+  // First 3 data rows
+  var firstN = Math.min(3, totalDataRows);
+  for (var f = 0; f < firstN; f++) {
+    rowsToInclude[dataStartRow + f] = true;
+  }
+
+  // Last 3 data rows
+  var lastStart = Math.max(dataStartRow, numRows - 3);
+  for (var l = lastStart; l < numRows; l++) {
+    rowsToInclude[l] = true;
+  }
+
+  // Build cells for included rows + capped columns only
+  var cells = [];
+  for (var r = 0; r < numRows; r++) {
+    if (!rowsToInclude[r]) continue;
+    for (var c = 0; c < cappedCols; c++) {
+      var val = values[r][c];
+      var formula = formulas[r][c];
+      if (val === '' && formula === '') continue;
+
+      var cell = {
+        row: r + 1,
+        col: c + 1,
+        ref: _colLetter(c + 1) + (r + 1)
+      };
+
+      if (formula) {
+        cell.formula = formula;
+        cell.value = val;
+      } else {
+        cell.value = val;
+      }
+
+      var color = fontColors[r][c];
+      if (color === '#0000ff' || color === '#0000FF') {
+        cell.role = 'input';
+      } else if (color === '#008000') {
+        cell.role = 'crossref';
+      } else if (formula) {
+        cell.role = 'formula';
+      }
+
+      cells.push(cell);
+    }
+  }
+
+  return {
+    name: sheet.getName(),
+    index: sheet.getIndex(),
+    isActive: false,
+    isSummary: true,
+    dimensions: { rows: sheet.getMaxRows(), cols: sheet.getMaxColumns() },
+    dataRange: { rows: numRows, cols: numCols },
+    totalDataRows: totalDataRows,
+    type: _classifySheetType(sheet.getName(), values),
+    frozenRows: sheet.getFrozenRows(),
+    frozenCols: sheet.getFrozenColumns(),
+    cells: cells,
+    _tokenEstimate: Math.ceil(JSON.stringify(cells).length / 4)
+  };
 }
 
 /**

@@ -7,7 +7,7 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "serve": "npm run build && npx @google-cloud/functions-framework --target=analyze --port=8080",
-    "deploy:analyze": "gcloud functions deploy analyze --runtime nodejs20 --trigger-http --allow-unauthenticated --project crunchy-sheets --region us-central1 --source . --entry-point analyze --set-env-vars ANTHROPIC_API_KEY=$(cat ~/.config/secrets/anthropic-crunchy-sheets-key),SUPABASE_URL=https://diselpdcsgjgetgmixhc.supabase.co,SUPABASE_SERVICE_KEY=$(cat ~/.config/secrets/supabase-crunchy-sheets-service-key)",
+    "deploy:analyze": "gcloud functions deploy analyze --runtime nodejs20 --trigger-http --allow-unauthenticated --project crunchy-sheets --region us-central1 --source . --entry-point analyze --timeout=300 --memory=512MB --set-env-vars ANTHROPIC_API_KEY=$(cat ~/.config/secrets/anthropic-crunchy-sheets-key),SUPABASE_URL=https://diselpdcsgjgetgmixhc.supabase.co,SUPABASE_SERVICE_KEY=$(cat ~/.config/secrets/supabase-crunchy-sheets-service-key)",
     "deploy:auth": "gcloud functions deploy auth --runtime nodejs20 --trigger-http --allow-unauthenticated --project crunchy-sheets --region us-central1 --source . --entry-point auth --set-env-vars SUPABASE_URL=https://diselpdcsgjgetgmixhc.supabase.co,SUPABASE_SERVICE_KEY=$(cat ~/.config/secrets/supabase-crunchy-sheets-service-key)",
     "deploy": "npm run build && npm run deploy:analyze && npm run deploy:auth"
   },

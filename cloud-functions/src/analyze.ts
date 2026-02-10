@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 0,
 });
 
 const supabase = createClient(
@@ -49,6 +50,15 @@ concise financial commentary. Reference specific cells (e.g., "Cell B14 shows...
 
 Always be opinionated about structure. A well-organized model is worth more than
 a technically correct but messy one.
+
+COMMUNICATION STYLE:
+- You live in a narrow Google Sheets sidebar. Keep responses SHORT.
+- For greetings or simple questions: 1-2 sentences max.
+- For analysis: concise bullet points, not paragraphs. Reference specific cells.
+- For modifications: brief summary of what you'll change. Let the actions panel speak for itself.
+- Never list your capabilities unprompted. The user can see the skill chips.
+- No filler phrases ("I'd be happy to", "Great question", "Let me help you with that").
+- Be direct, opinionated, and finance-flavored.
 
 ${buildActionInstructions()}`;
 
@@ -107,7 +117,14 @@ export async function handleAnalyze(req: Request): Promise<AnalyzeResponse> {
   const skillContext: SkillContext = routeToSkill(body.prompt, body.skill);
 
   // 3. Build the Claude prompt
-  const workbookStateStr = JSON.stringify(body.workbookState, null, 2);
+  const workbookStateStr = JSON.stringify(body.workbookState);
+
+  // Safety net: reject if workbook context would blow the token limit
+  const estimatedTokens = Math.ceil(workbookStateStr.length / 4);
+  if (estimatedTokens > 150000) {
+    throw new Error(`Workbook context too large (~${Math.round(estimatedTokens / 1000)}K tokens). Try switching to a smaller tab and resending.`);
+  }
+
   const userMessage = buildUserMessage(body.prompt, workbookStateStr, skillContext);
 
   // 4. Select model based on skill tier

@@ -145,6 +145,35 @@ Edge cases:
 
 Do NOT include an "actions" array. Do NOT include a "response" field. Return ONLY the formula_xray JSON block.`,
   },
+  {
+    id: 'prove_it',
+    modelTier: 'opus',
+    maxTokens: 12288,
+    keywords: /prove\s+it|show\s+(me\s+)?your\s+work|back\s+it\s+up|prove\s+(that|this|the\s+numbers)/i,
+    instruction: 'Build a proof tab that verifies your previous analysis. Create a sheet with formulas tracing every key number back to source cells. The proof must be auditable — every number from the workbook is a formula, never hardcoded.',
+    systemAddendum: `
+PROVE IT MODE — build an auditable proof tab.
+
+The user's prompt contains their previous AI response wrapped in [Previous AI Response]...[/Previous AI Response]. Parse it to identify every specific number, percentage, or calculation you claimed. Each one needs a proof row.
+
+If no [Previous AI Response] block exists, respond: "Nothing to verify yet — ask me a question first, then say 'prove it' to see the math."
+
+BUILD THE PROOF TAB:
+1. Create a sheet via add_sheet named "Proof: {Short Topic}" (max 30 chars) with tabColor "#1e8e3e"
+2. Structure it clearly: labeled source values (as cross-tab formulas like ='P&L'!B14), derivation steps, and results
+3. Row 1 should be a bold header row. Use freeze_rows to keep it visible.
+4. Use set_column_width to make label columns wide enough to read (200px+)
+5. Color-code with format_cell: blue font (#0000FF) for hard-coded inputs, green font (#008000) for cross-tab source refs, black for calculations
+6. Header row background: #e8f0fe, bold
+7. ALWAYS end with an activate_sheet action so the user lands on the proof tab after Apply
+
+RULES:
+- Max 30 data rows (focus on the most significant claims)
+- Every value that exists in the workbook MUST be a cross-tab formula reference, never hardcoded
+- If a number cannot be traced to a cell (not in workbook), prefix the label with "[Manual]" and use blue (#0000FF) font
+- Tab name must start with "Proof: "
+- The proof must be self-contained — anyone should be able to click through formulas to verify`,
+  },
 ];
 
 // ─── Router ──────────────────────────────────────────────────────────────────

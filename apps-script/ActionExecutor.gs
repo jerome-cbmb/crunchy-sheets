@@ -91,6 +91,15 @@ function _executeSingleAction(ss, action, index) {
     case 'add_named_range':
       return _execAddNamedRange(ss, action);
 
+    case 'activate_sheet':
+      return _execActivateSheet(ss, action);
+
+    case 'set_column_width':
+      return _execSetColumnWidth(ss, action);
+
+    case 'freeze_rows':
+      return _execFreezeRows(ss, action);
+
     default:
       throw new Error('Unknown action type: ' + action.type);
   }
@@ -209,7 +218,25 @@ function _execAddSheet(ss, action) {
     return { skipped: true, reason: 'Sheet "' + name + '" already exists' };
   }
 
-  ss.insertSheet(name);
+  // Proof tab limit: max 5 tabs starting with "Proof: "
+  if (name.indexOf('Proof: ') === 0) {
+    var sheets = ss.getSheets();
+    var proofCount = 0;
+    for (var i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName().indexOf('Proof: ') === 0) proofCount++;
+    }
+    if (proofCount >= 5) {
+      return { skipped: true, reason: 'Proof tab limit reached (max 5). Delete an existing Proof tab first.' };
+    }
+  }
+
+  var newSheet = ss.insertSheet(name);
+
+  // Apply tab color if specified
+  if (action.tabColor) {
+    newSheet.setTabColor(action.tabColor);
+  }
+
   return { skipped: false };
 }
 
@@ -274,6 +301,53 @@ function _execAddNamedRange(ss, action) {
   return { skipped: false };
 }
 
+/**
+ * activate_sheet — Switch the active sheet so the user lands on it after Apply.
+ * Expected fields: { type, sheet }
+ */
+function _execActivateSheet(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  ss.setActiveSheet(sheet);
+  return { skipped: false };
+}
+
+/**
+ * set_column_width — Set a column's width in pixels.
+ * Expected fields: { type, sheet, column, width }
+ */
+function _execSetColumnWidth(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var colNum = _colLetterToNum(action.column);
+  sheet.setColumnWidth(colNum, action.width);
+  return { skipped: false };
+}
+
+/**
+ * freeze_rows — Freeze the top N rows on a sheet.
+ * Expected fields: { type, sheet, rows }
+ */
+function _execFreezeRows(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  sheet.setFrozenRows(action.rows);
+  return { skipped: false };
+}
+
+/**
+ * Convert column letter(s) to a 1-based column number.
+ * A=1, Z=26, AA=27, AZ=52, etc.
+ */
+function _colLetterToNum(col) {
+  if (!col || typeof col !== 'string') {
+    throw new Error('Column letter is required');
+  }
+  col = col.toUpperCase();
+  var num = 0;
+  for (var i = 0; i < col.length; i++) {
+    num = num * 26 + (col.charCodeAt(i) - 64);
+  }
+  return num;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -331,6 +405,15 @@ function _describeAction(action) {
 
     case 'add_named_range':
       return 'Named range "' + action.rangeName + '" → ' + action.rangeA1;
+
+    case 'activate_sheet':
+      return 'Switch to sheet "' + action.sheet + '"';
+
+    case 'set_column_width':
+      return 'Set column ' + action.column + ' width to ' + action.width + 'px on ' + action.sheet;
+
+    case 'freeze_rows':
+      return 'Freeze top ' + action.rows + ' row' + (action.rows !== 1 ? 's' : '') + ' on ' + action.sheet;
 
     default:
       return action.type + ' (unknown)';

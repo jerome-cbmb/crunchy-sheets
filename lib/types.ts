@@ -1,7 +1,7 @@
 // ─── Cell Actions ──────────────────────────────────────────────────────────
 
 export interface CellAction {
-  type: 'set_value' | 'set_formula' | 'format_cell' | 'add_sheet' | 'rename_sheet' | 'add_named_range';
+  type: 'set_value' | 'set_formula' | 'format_cell' | 'add_sheet' | 'rename_sheet' | 'add_named_range' | 'activate_sheet' | 'set_column_width' | 'freeze_rows';
   sheet?: string;
   cell?: string;
   value?: any;
@@ -15,6 +15,10 @@ export interface CellAction {
   sheetName?: string;
   rangeName?: string;
   rangeA1?: string;
+  tabColor?: string;
+  column?: string;
+  width?: number;
+  rows?: number;
 }
 
 // ─── Skill Router ──────────────────────────────────────────────────────────

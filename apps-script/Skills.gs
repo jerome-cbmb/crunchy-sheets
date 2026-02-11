@@ -92,6 +92,13 @@ var SKILLS = [
     description: 'Break down any formula into color-coded components with plain-English explanations.',
     modelTier: 'sonnet',
     category: 'analysis'
+  },
+  {
+    id: 'prove_it',
+    name: 'Prove It',
+    description: 'Build an auditable proof tab tracing every claimed number back to source cells.',
+    modelTier: 'opus',
+    category: 'analysis'
   }
 ];
 

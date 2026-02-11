@@ -86,7 +86,7 @@ function validateAction(action: any): ValidationResult {
   }
 
   const type = action.type;
-  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range'].includes(type)) {
+  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows'].includes(type)) {
     return { valid: false, error: `Invalid action type: ${type}` };
   }
 
@@ -130,6 +130,24 @@ function validateAction(action: any): ValidationResult {
         return { valid: false, error: 'add_named_range requires rangeName and rangeA1' };
       }
       break;
+
+    case 'activate_sheet':
+      if (!action.sheet) {
+        return { valid: false, error: 'activate_sheet requires sheet' };
+      }
+      break;
+
+    case 'set_column_width':
+      if (!action.sheet || !action.column || !action.width) {
+        return { valid: false, error: 'set_column_width requires sheet, column, and width' };
+      }
+      break;
+
+    case 'freeze_rows':
+      if (!action.sheet || !action.rows) {
+        return { valid: false, error: 'freeze_rows requires sheet and rows' };
+      }
+      break;
   }
 
   return { valid: true, action };
@@ -145,8 +163,11 @@ When you modify a workbook, return your response as a JSON object with this stru
     { "type": "set_value", "sheet": "SheetName", "cell": "A1", "value": "Revenue" },
     { "type": "set_formula", "sheet": "SheetName", "cell": "A2", "formula": "=A1*1.1" },
     { "type": "format_cell", "sheet": "SheetName", "cell": "A1", "format": { "fontColor": "#0000FF", "bold": true } },
-    { "type": "add_sheet", "sheetName": "Dashboard" },
-    { "type": "add_named_range", "rangeName": "Revenue_Growth", "rangeA1": "Assumptions!B5" }
+    { "type": "add_sheet", "sheetName": "Dashboard", "tabColor": "#1e8e3e" },
+    { "type": "add_named_range", "rangeName": "Revenue_Growth", "rangeA1": "Assumptions!B5" },
+    { "type": "activate_sheet", "sheet": "Dashboard" },
+    { "type": "set_column_width", "sheet": "Dashboard", "column": "A", "width": 200 },
+    { "type": "freeze_rows", "sheet": "Dashboard", "rows": 1 }
   ],
   "response": "I've set up the revenue forecast with growth rate input...",
   "summary": "Created Assumptions sheet with 5 key inputs"

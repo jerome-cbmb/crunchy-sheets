@@ -749,6 +749,24 @@
         fullPrompt = '[skill:' + selectedSkill + '] ' + text;
       }
 
+      // "Prove It" context injection
+      var proveItRegex = /prove\s+it|show\s+(me\s+)?your\s+work|back\s+it\s+up|prove\s+(that|this|the\s+numbers)/i;
+      var isProveIt = selectedSkill === 'prove_it' || proveItRegex.test(text);
+      if (isProveIt) {
+        var lastAssistantText = getLastAssistantText();
+        if (lastAssistantText) {
+          fullPrompt = '[Previous AI Response]\n' + lastAssistantText
+            + '\n[/Previous AI Response]\n\n' + fullPrompt;
+        } else if (!selectedSkill) {
+          // No previous message + keyword auto-detect (not explicit chip)
+          // Short-circuit: show local message, don't hit API at all
+          setLoading(false);
+          addMessage('Nothing to verify yet — ask a question first, then say "prove it" to see the math.', 'assistant');
+          return;
+        }
+        // Explicit chip with no context: let it through — Claude will respond with the same message server-side
+      }
+
       // Step 1: Get payload from Apps Script (workbook state + auth token)
       google.script.run
         .withSuccessHandler(function(payload) {
@@ -963,7 +981,7 @@
       }
 
       var type = action.type;
-      var validTypes = ['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range'];
+      var validTypes = ['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows'];
       if (!type || validTypes.indexOf(type) === -1) {
         return { valid: false, error: 'Invalid action type: ' + type };
       }
@@ -1002,6 +1020,21 @@
         case 'add_named_range':
           if (!action.rangeName || !action.rangeA1) {
             return { valid: false, error: 'add_named_range requires rangeName and rangeA1' };
+          }
+          break;
+        case 'activate_sheet':
+          if (!action.sheet) {
+            return { valid: false, error: 'activate_sheet requires sheet' };
+          }
+          break;
+        case 'set_column_width':
+          if (!action.sheet || !action.column || !action.width) {
+            return { valid: false, error: 'set_column_width requires sheet, column, and width' };
+          }
+          break;
+        case 'freeze_rows':
+          if (!action.sheet || !action.rows) {
+            return { valid: false, error: 'freeze_rows requires sheet and rows' };
           }
           break;
       }
@@ -1384,6 +1417,19 @@
       scrollToBottom();
     }
 
+    /**
+     * Get the text content of the last assistant message in the chat.
+     * Used for "Prove It" context injection.
+     */
+    function getLastAssistantText() {
+      var messages = document.querySelectorAll('.message.assistant');
+      if (messages.length === 0) return null;
+      var last = messages[messages.length - 1];
+      var text = (last.textContent || last.innerText || '').trim();
+      if (text.length > 3000) text = text.substring(0, 3000) + '... [truncated]';
+      return text || null;
+    }
+
     // ─── Utility ────────────────────────────────────────────────────────
 
     function setLoading(on) {
@@ -1407,7 +1453,10 @@
         'format_cell': 'format',
         'add_sheet': 'sheet',
         'rename_sheet': 'rename',
-        'add_named_range': 'range'
+        'add_named_range': 'range',
+        'activate_sheet': 'activate',
+        'set_column_width': 'width',
+        'freeze_rows': 'freeze'
       };
       return map[type] || type;
     }
@@ -1444,6 +1493,15 @@
 
         case 'add_named_range':
           return '"' + action.rangeName + '" → ' + action.rangeA1;
+
+        case 'activate_sheet':
+          return 'Switch to "' + action.sheet + '"';
+
+        case 'set_column_width':
+          return 'Column ' + action.column + ' → ' + action.width + 'px on ' + action.sheet;
+
+        case 'freeze_rows':
+          return 'Freeze ' + action.rows + ' row' + (action.rows !== 1 ? 's' : '') + ' on ' + action.sheet;
 
         default:
           return JSON.stringify(action);

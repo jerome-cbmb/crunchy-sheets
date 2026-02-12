@@ -55,7 +55,7 @@ function serializeWorkbookState(activeSheetOverride) {
  * @return {Object} Sheet state.
  */
 function _safeValue(val) {
-  if (val instanceof Date) return val.toISOString();
+  if (val instanceof Date) return Utilities.formatDate(val, Session.getScriptTimeZone(), 'M/d/yyyy');
   if (typeof val === 'number' && !isFinite(val)) return null;
   return val;
 }

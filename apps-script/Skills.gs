@@ -87,6 +87,13 @@ var SKILLS = [
     category: 'analysis'
   },
   {
+    id: 'workbook_format',
+    name: 'Format & Organize',
+    description: 'Full workbook housekeeping — formatting, alignment, cleanup, tab organization.',
+    modelTier: 'sonnet',
+    category: 'automation'
+  },
+  {
     id: 'formula_xray',
     name: 'Formula X-Ray',
     description: 'Break down any formula into color-coded components with plain-English explanations.',

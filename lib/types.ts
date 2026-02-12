@@ -1,7 +1,7 @@
 // ─── Cell Actions ──────────────────────────────────────────────────────────
 
 export interface CellAction {
-  type: 'set_value' | 'set_formula' | 'format_cell' | 'add_sheet' | 'rename_sheet' | 'add_named_range' | 'activate_sheet' | 'set_column_width' | 'freeze_rows';
+  type: 'set_value' | 'set_formula' | 'format_cell' | 'add_sheet' | 'rename_sheet' | 'add_named_range' | 'activate_sheet' | 'set_column_width' | 'freeze_rows' | 'format_range' | 'set_border' | 'auto_resize_columns' | 'delete_sheet' | 'set_tab_color' | 'add_note' | 'move_sheet';
   sheet?: string;
   cell?: string;
   value?: any;
@@ -9,8 +9,14 @@ export interface CellAction {
   format?: {
     fontColor?: string;
     background?: string;
+    backgroundColor?: string;
     bold?: boolean;
+    italic?: boolean;
+    fontSize?: number;
     numberFormat?: string;
+    horizontalAlignment?: string;
+    verticalAlignment?: string;
+    wrapStrategy?: string;
   };
   sheetName?: string;
   rangeName?: string;
@@ -19,6 +25,19 @@ export interface CellAction {
   column?: string;
   width?: number;
   rows?: number;
+  range?: string;
+  color?: string;
+  position?: number;
+  note?: string;
+  startColumn?: string;
+  endColumn?: string;
+  top?: boolean;
+  left?: boolean;
+  bottom?: boolean;
+  right?: boolean;
+  vertical?: boolean;
+  horizontal?: boolean;
+  style?: string;
 }
 
 // ─── Skill Router ──────────────────────────────────────────────────────────

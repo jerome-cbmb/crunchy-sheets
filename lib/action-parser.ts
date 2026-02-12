@@ -86,7 +86,7 @@ function validateAction(action: any): ValidationResult {
   }
 
   const type = action.type;
-  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows'].includes(type)) {
+  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet'].includes(type)) {
     return { valid: false, error: `Invalid action type: ${type}` };
   }
 
@@ -148,6 +148,51 @@ function validateAction(action: any): ValidationResult {
         return { valid: false, error: 'freeze_rows requires sheet and rows' };
       }
       break;
+
+    case 'format_range':
+      if (!action.sheet || !action.range) {
+        return { valid: false, error: 'format_range requires sheet and range' };
+      }
+      if (!action.format || typeof action.format !== 'object') {
+        return { valid: false, error: 'format_range requires format object' };
+      }
+      break;
+
+    case 'set_border':
+      if (!action.sheet || !action.range) {
+        return { valid: false, error: 'set_border requires sheet and range' };
+      }
+      break;
+
+    case 'auto_resize_columns':
+      if (!action.sheet || !action.startColumn || !action.endColumn) {
+        return { valid: false, error: 'auto_resize_columns requires sheet, startColumn, and endColumn' };
+      }
+      break;
+
+    case 'delete_sheet':
+      if (!action.sheet) {
+        return { valid: false, error: 'delete_sheet requires sheet' };
+      }
+      break;
+
+    case 'set_tab_color':
+      if (!action.sheet || !action.color) {
+        return { valid: false, error: 'set_tab_color requires sheet and color' };
+      }
+      break;
+
+    case 'add_note':
+      if (!action.sheet || !action.cell || !action.note) {
+        return { valid: false, error: 'add_note requires sheet, cell, and note' };
+      }
+      break;
+
+    case 'move_sheet':
+      if (!action.sheet || action.position == null) {
+        return { valid: false, error: 'move_sheet requires sheet and position' };
+      }
+      break;
   }
 
   return { valid: true, action };
@@ -167,7 +212,14 @@ When you modify a workbook, return your response as a JSON object with this stru
     { "type": "add_named_range", "rangeName": "Revenue_Growth", "rangeA1": "Assumptions!B5" },
     { "type": "activate_sheet", "sheet": "Dashboard" },
     { "type": "set_column_width", "sheet": "Dashboard", "column": "A", "width": 200 },
-    { "type": "freeze_rows", "sheet": "Dashboard", "rows": 1 }
+    { "type": "freeze_rows", "sheet": "Dashboard", "rows": 1 },
+    { "type": "format_range", "sheet": "P&L", "range": "A1:H1", "format": { "bold": true, "verticalAlignment": "middle", "wrapStrategy": "WRAP" } },
+    { "type": "set_border", "sheet": "P&L", "range": "A1:H1", "bottom": true, "style": "SOLID", "color": "#000000" },
+    { "type": "auto_resize_columns", "sheet": "P&L", "startColumn": "A", "endColumn": "H" },
+    { "type": "delete_sheet", "sheet": "Sheet3" },
+    { "type": "set_tab_color", "sheet": "Assumptions", "color": "#4285f4" },
+    { "type": "add_note", "sheet": "Assumptions", "cell": "B3", "note": "Key growth driver" },
+    { "type": "move_sheet", "sheet": "Dashboard", "position": 1 }
   ],
   "response": "I've set up the revenue forecast with growth rate input...",
   "summary": "Created Assumptions sheet with 5 key inputs"

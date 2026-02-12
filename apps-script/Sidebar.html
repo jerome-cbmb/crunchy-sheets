@@ -384,7 +384,10 @@
       font-family: 'Roboto Mono', monospace;
       font-size: 12px;
       font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
     }
+    .cell-ref:hover { text-decoration: underline; }
 
     /* ─── Onboarding card ────────────────────────────────── */
     .onboarding-card {
@@ -602,6 +605,41 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Streaming indicators ────────────────────────────── */
+    .json-building {
+      color: #1a73e8; font-size: 11px; margin-top: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .spinner.small { width: 12px; height: 12px; border-width: 1.5px; }
+    .stream-placeholder { color: #9aa0a6; font-size: 12px; font-style: italic; }
+
+    /* ─── Action type color tags ──────────────────────────── */
+    .tag-set_formula { background: #e6f4ea; color: #137333; }
+    .tag-format_cell { background: #e8f0fe; color: #1a73e8; }
+    .tag-set_value { background: #fef7e0; color: #b06000; }
+    .tag-format_range { background: #e8f0fe; color: #1a73e8; }
+    .tag-set_border { background: #f3e8fd; color: #7b1fa2; }
+    .tag-auto_resize_columns { background: #e6f4ea; color: #137333; }
+    .tag-delete_sheet { background: #fce8e6; color: #c5221f; }
+    .tag-set_tab_color { background: #fef7e0; color: #b06000; }
+    .tag-add_note { background: #e8f0fe; color: #1a73e8; }
+    .tag-move_sheet { background: #f3e8fd; color: #7b1fa2; }
+
+    /* ─── Skip reasons in results ─────────────────────────── */
+    .skip-reason { padding: 4px 14px; font-size: 11px; color: #b06000; }
+
+    /* ─── Prove It chip accent ────────────────────────────── */
+    .skill-chip-prove { border-color: #1e8e3e; color: #1e8e3e; }
+    .skill-chip-prove:hover { border-color: #137333; color: #137333; }
+    .skill-chip-prove.active { background: #e6f4ea; border-color: #1e8e3e; color: #1e8e3e; }
+
+    /* ─── Proof link ──────────────────────────────────────── */
+    .proof-link {
+      padding: 8px 14px; color: #1e8e3e; font-size: 12px;
+      font-weight: 500; cursor: pointer; border-top: 1px solid #e8eaed;
+    }
+    .proof-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -690,6 +728,7 @@
           skills.forEach(function(skill) {
             var chip = document.createElement('div');
             chip.className = 'skill-chip';
+            if (skill.id === 'prove_it') chip.classList.add('skill-chip-prove');
             chip.textContent = skill.name;
             chip.dataset.id = skill.id;
             chip.onclick = function() {
@@ -739,13 +778,47 @@
       var text = input.value.trim();
       if (!text) return;
 
+      // /prove slash command
+      var proveSlashMatch = text.match(/^\/prove\s+(.*)/i);
+      if (proveSlashMatch) {
+        selectedSkill = 'prove_it';
+        text = proveSlashMatch[1];
+        document.querySelectorAll('.skill-chip').forEach(function(c) {
+          c.classList.toggle('active', c.dataset.id === 'prove_it');
+        });
+      }
+
+      // /xray shortcut
+      var xrayMatch = text.match(/^\/xray\s*(.*)/i);
+      if (xrayMatch) {
+        var cellRef = xrayMatch[1].trim();
+        text = cellRef ? 'Explain the formula in ' + cellRef : 'Explain the most complex formula';
+        selectedSkill = 'formula_xray';
+        document.querySelectorAll('.skill-chip').forEach(function(c) {
+          c.classList.toggle('active', c.dataset.id === 'formula_xray');
+        });
+      }
+
+      // /format shortcut
+      var formatMatch = text.match(/^\/format\s*(.*)/i);
+      if (formatMatch) {
+        var instruction = formatMatch[1].trim();
+        text = instruction
+          ? 'Format this workbook: ' + instruction
+          : 'Run a full housekeeping sweep on this workbook';
+        selectedSkill = 'workbook_format';
+        document.querySelectorAll('.skill-chip').forEach(function(c) {
+          c.classList.toggle('active', c.dataset.id === 'workbook_format');
+        });
+      }
+
       addMessage(text, 'user');
       input.value = '';
       setLoading(true);
 
-      // Prepend skill hint if selected
+      // Prepend skill hint if selected (prove_it doesn't need prefix — it's sent in body)
       var fullPrompt = text;
-      if (selectedSkill) {
+      if (selectedSkill && selectedSkill !== 'prove_it') {
         fullPrompt = '[skill:' + selectedSkill + '] ' + text;
       }
 
@@ -798,9 +871,14 @@
      * Update a streaming message div with accumulated text (progressive markdown).
      */
     function updateStreamingMessage(div, text) {
-      // Strip any JSON code block from display during streaming
+      // Strip completed JSON code blocks from display during streaming
       var displayText = text.replace(/```json[\s\S]*?```/g, '').trim();
-      if (displayText) {
+      // Detect open JSON fence with no closing fence → show building indicator
+      var hasOpenJson = /```json/.test(text) && !(/```json[\s\S]*?```/).test(text);
+      if (hasOpenJson) {
+        var indicator = '<div class="json-building"><span class="spinner small"></span> Building changes...</div>';
+        div.innerHTML = (displayText ? renderMarkdown(escapeHtml(displayText)) : '') + indicator;
+      } else if (displayText) {
         div.innerHTML = renderMarkdown(escapeHtml(displayText));
       }
     }
@@ -823,6 +901,7 @@
         return;
       }
       var msgDiv = createStreamingMessage();
+      msgDiv.innerHTML = '<span class="stream-placeholder">Reading your spreadsheet...</span>';
 
       try {
         var response = await fetch(VERCEL_API_BASE + '/api/analyze', {
@@ -875,6 +954,9 @@
      * Parse the completed streamed response for actions/xray.
      */
     function finalizeStreamedMessage(msgDiv, fullText) {
+      // Store raw text for Prove It context injection
+      msgDiv.dataset.rawText = fullText;
+
       var parsed = parseStreamedResponse(fullText);
 
       // Formula X-Ray — replace streaming div with xray card
@@ -981,7 +1063,7 @@
       }
 
       var type = action.type;
-      var validTypes = ['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows'];
+      var validTypes = ['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet'];
       if (!type || validTypes.indexOf(type) === -1) {
         return { valid: false, error: 'Invalid action type: ' + type };
       }
@@ -1137,8 +1219,14 @@
       text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
       // Inline code: `text`
       text = text.replace(/`(.+?)`/g, '<code>$1</code>');
-      // Cell references: Sheet!A1:B2 or A1:B2 or A1
-      text = text.replace(/\b([A-Za-z0-9_]+!)?[A-Z]{1,3}[0-9]+(:[A-Z]{1,3}[0-9]+)?\b/g, '<span class="cell-ref">$&</span>');
+      // Cell references: Sheet!A1:B2 or 'Sheet Name'!A1:B2 or A1:B2 or A1 — make clickable
+      text = text.replace(
+        /\b((?:[A-Za-z0-9_ ]+|'[^']+')!)?([A-Z]{1,3}[0-9]+(?::[A-Z]{1,3}[0-9]+)?)\b/g,
+        function(match, sheetPart, cellPart) {
+          var sheet = sheetPart ? sheetPart.replace(/[!']/g, '').trim() : '';
+          return '<span class="cell-ref" data-sheet="' + sheet + '" data-cell="' + cellPart + '" onclick="navigateToCellRef(this)">' + match + '</span>';
+        }
+      );
       return text;
     }
 
@@ -1201,10 +1289,18 @@
       var list = document.createElement('div');
       list.className = 'actions-list';
 
+      // Expand panel for Prove It proof sheets
+      var isProofAction = actions.some(function(a) {
+        return a.type === 'add_sheet' && a.sheetName && a.sheetName.indexOf('Proof: ') === 0;
+      });
+      list.style.maxHeight = isProofAction ? '300px' : '180px';
+
       actions.forEach(function(action) {
         var item = document.createElement('div');
         item.className = 'action-item';
-        item.innerHTML = '<span class="action-type-tag">' + escapeHtml(formatActionType(action.type)) + '</span> ' + escapeHtml(describeActionLocally(action));
+        item.innerHTML = '<span class="action-type-tag tag-' + (action.type || 'default') + '">'
+          + escapeHtml(formatActionType(action.type)) + '</span> '
+          + escapeHtml(describeActionLocally(action));
         list.appendChild(item);
       });
 
@@ -1248,6 +1344,7 @@
       }
 
       var actionsToApply = pendingActions;
+      var lastAppliedActions = pendingActions;
       pendingActions = null;
 
       google.script.run
@@ -1256,8 +1353,8 @@
           var panel = document.getElementById('actionsPanelActive');
           if (panel) panel.remove();
 
-          // Show results
-          addResultsPanel(result);
+          // Show results (pass applied actions for proof link)
+          addResultsPanel(result, lastAppliedActions);
         })
         .withFailureHandler(function(err) {
           var panel = document.getElementById('actionsPanelActive');
@@ -1280,7 +1377,7 @@
     /**
      * Render the results panel after actions are applied.
      */
-    function addResultsPanel(result) {
+    function addResultsPanel(result, appliedActions) {
       var container = document.getElementById('messages');
       var panel = document.createElement('div');
       panel.className = 'results-panel';
@@ -1304,6 +1401,19 @@
 
       panel.appendChild(stats);
 
+      // Show skip reasons
+      if (result.skipReasons && result.skipReasons.length > 0) {
+        var skipDiv = document.createElement('div');
+        skipDiv.className = 'results-skip-reasons';
+        result.skipReasons.forEach(function(r) {
+          var reason = document.createElement('div');
+          reason.className = 'skip-reason';
+          reason.textContent = r;
+          skipDiv.appendChild(reason);
+        });
+        panel.appendChild(skipDiv);
+      }
+
       // Show error details
       if (result.errors && result.errors.length > 0) {
         var errDiv = document.createElement('div');
@@ -1316,6 +1426,22 @@
         });
         errDiv.appendChild(errUl);
         panel.appendChild(errDiv);
+      }
+
+      // "View proof" link for Prove It actions
+      if (appliedActions) {
+        var proofSheet = appliedActions.find(function(a) {
+          return a.type === 'add_sheet' && a.sheetName && a.sheetName.indexOf('Proof: ') === 0;
+        });
+        if (proofSheet) {
+          var link = document.createElement('div');
+          link.className = 'proof-link';
+          link.textContent = 'View proof: ' + proofSheet.sheetName;
+          link.onclick = function() {
+            google.script.run.navigateToCell(proofSheet.sheetName, 'A1');
+          };
+          panel.appendChild(link);
+        }
       }
 
       container.appendChild(panel);
@@ -1425,9 +1551,24 @@
       var messages = document.querySelectorAll('.message.assistant');
       if (messages.length === 0) return null;
       var last = messages[messages.length - 1];
-      var text = (last.textContent || last.innerText || '').trim();
+      // Prefer raw streamed text (preserves full response including JSON)
+      var text = last.dataset.rawText || (last.textContent || last.innerText || '').trim();
+      text = text.replace(/```json[\s\S]*?```/g, '').trim();
       if (text.length > 3000) text = text.substring(0, 3000) + '... [truncated]';
       return text || null;
+    }
+
+    // ─── Cell Navigation ─────────────────────────────────────────────────
+
+    /**
+     * Navigate to a cell reference when clicked in chat.
+     */
+    function navigateToCellRef(el) {
+      var sheet = el.dataset.sheet || '';
+      var cell = el.dataset.cell || '';
+      if (cell) {
+        google.script.run.navigateToCell(sheet, cell);
+      }
     }
 
     // ─── Utility ────────────────────────────────────────────────────────
@@ -1456,7 +1597,14 @@
         'add_named_range': 'range',
         'activate_sheet': 'activate',
         'set_column_width': 'width',
-        'freeze_rows': 'freeze'
+        'freeze_rows': 'freeze',
+        'format_range': 'format',
+        'set_border': 'border',
+        'auto_resize_columns': 'resize',
+        'delete_sheet': 'delete',
+        'set_tab_color': 'tab color',
+        'add_note': 'note',
+        'move_sheet': 'move'
       };
       return map[type] || type;
     }
@@ -1502,6 +1650,44 @@
 
         case 'freeze_rows':
           return 'Freeze ' + action.rows + ' row' + (action.rows !== 1 ? 's' : '') + ' on ' + action.sheet;
+
+        case 'format_range':
+          var fParts = [];
+          var fFmt = action.format || {};
+          if (fFmt.fontColor) fParts.push(fFmt.fontColor);
+          if (fFmt.bold) fParts.push('bold');
+          if (fFmt.italic) fParts.push('italic');
+          if (fFmt.numberFormat) fParts.push(fFmt.numberFormat);
+          if (fFmt.background || fFmt.backgroundColor) fParts.push('bg:' + (fFmt.background || fFmt.backgroundColor));
+          if (fFmt.verticalAlignment) fParts.push('vAlign:' + fFmt.verticalAlignment);
+          if (fFmt.horizontalAlignment) fParts.push('hAlign:' + fFmt.horizontalAlignment);
+          if (fFmt.wrapStrategy) fParts.push('wrap:' + fFmt.wrapStrategy);
+          return action.range + ' on ' + action.sheet + ' \u2192 ' + (fParts.join(', ') || 'formatting');
+
+        case 'set_border':
+          var bSides = [];
+          if (action.top) bSides.push('top');
+          if (action.bottom) bSides.push('bottom');
+          if (action.left) bSides.push('left');
+          if (action.right) bSides.push('right');
+          return action.range + ' on ' + action.sheet + ' \u2192 border (' + (bSides.join(', ') || 'all') + ')';
+
+        case 'auto_resize_columns':
+          return 'Columns ' + action.startColumn + '\u2013' + action.endColumn + ' on ' + action.sheet;
+
+        case 'delete_sheet':
+          return 'Delete sheet "' + action.sheet + '"';
+
+        case 'set_tab_color':
+          return '"' + action.sheet + '" \u2192 ' + action.color;
+
+        case 'add_note':
+          var noteText = action.note || '';
+          if (noteText.length > 25) noteText = noteText.substring(0, 24) + '\u2026';
+          return action.cell + ' on ' + action.sheet + ': "' + noteText + '"';
+
+        case 'move_sheet':
+          return '"' + action.sheet + '" \u2192 position ' + action.position;
 
         default:
           return JSON.stringify(action);

@@ -30,9 +30,10 @@ function executeActions(actions) {
   var applied = 0;
   var skipped = 0;
   var errors = [];
+  var skipReasons = [];
 
   if (!actions || !Array.isArray(actions)) {
-    return { applied: 0, skipped: 0, errors: ['No valid actions array provided'] };
+    return { applied: 0, skipped: 0, errors: ['No valid actions array provided'], skipReasons: [] };
   }
 
   for (var i = 0; i < actions.length; i++) {
@@ -41,6 +42,7 @@ function executeActions(actions) {
       var result = _executeSingleAction(ss, action, i);
       if (result.skipped) {
         skipped++;
+        if (result.reason) skipReasons.push(result.reason);
         Logger.log('[ActionExecutor] Skipped action ' + i + ': ' + result.reason);
       } else {
         applied++;
@@ -57,7 +59,8 @@ function executeActions(actions) {
   return {
     applied: applied,
     skipped: skipped,
-    errors: errors
+    errors: errors,
+    skipReasons: skipReasons
   };
 }
 
@@ -99,6 +102,27 @@ function _executeSingleAction(ss, action, index) {
 
     case 'freeze_rows':
       return _execFreezeRows(ss, action);
+
+    case 'format_range':
+      return _execFormatRange(ss, action);
+
+    case 'set_border':
+      return _execSetBorder(ss, action);
+
+    case 'auto_resize_columns':
+      return _execAutoResizeColumns(ss, action);
+
+    case 'delete_sheet':
+      return _execDeleteSheet(ss, action);
+
+    case 'set_tab_color':
+      return _execSetTabColor(ss, action);
+
+    case 'add_note':
+      return _execAddNote(ss, action);
+
+    case 'move_sheet':
+      return _execMoveSheet(ss, action);
 
     default:
       throw new Error('Unknown action type: ' + action.type);
@@ -333,6 +357,154 @@ function _execFreezeRows(ss, action) {
 }
 
 /**
+ * format_range — Apply formatting to a range of cells.
+ * Expected fields: { type, sheet, range, format }
+ * Supported format properties:
+ *   fontColor, background/backgroundColor, bold, italic, fontSize,
+ *   numberFormat, horizontalAlignment, verticalAlignment, wrapStrategy
+ */
+function _execFormatRange(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var range = sheet.getRange(action.range);
+  var fmt = action.format;
+
+  if (!fmt || typeof fmt !== 'object') {
+    throw new Error('format_range requires a format object');
+  }
+
+  if (fmt.fontColor) {
+    range.setFontColor(fmt.fontColor);
+  }
+
+  var bgColor = fmt.background || fmt.backgroundColor;
+  if (bgColor) {
+    range.setBackground(bgColor);
+  }
+
+  if (fmt.bold !== undefined) {
+    range.setFontWeight(fmt.bold ? 'bold' : 'normal');
+  }
+
+  if (fmt.italic !== undefined) {
+    range.setFontStyle(fmt.italic ? 'italic' : 'normal');
+  }
+
+  if (fmt.fontSize !== undefined) {
+    range.setFontSize(fmt.fontSize);
+  }
+
+  if (fmt.numberFormat) {
+    range.setNumberFormat(fmt.numberFormat);
+  }
+
+  if (fmt.horizontalAlignment) {
+    range.setHorizontalAlignment(fmt.horizontalAlignment);
+  }
+
+  if (fmt.verticalAlignment) {
+    range.setVerticalAlignment(fmt.verticalAlignment);
+  }
+
+  if (fmt.wrapStrategy) {
+    range.setWrapStrategy(SpreadsheetApp.WrapStrategy[fmt.wrapStrategy]);
+  }
+
+  return { skipped: false };
+}
+
+/**
+ * set_border — Apply borders to a range.
+ * Expected fields: { type, sheet, range, top?, bottom?, left?, right?, vertical?, horizontal?, style?, color? }
+ * Unspecified sides are passed as null (preserving existing borders).
+ */
+function _execSetBorder(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var range = sheet.getRange(action.range);
+
+  var style = action.style ? SpreadsheetApp.BorderStyle[action.style] : SpreadsheetApp.BorderStyle.SOLID;
+  var color = action.color || '#000000';
+
+  range.setBorder(
+    action.top != null ? action.top : null,
+    action.left != null ? action.left : null,
+    action.bottom != null ? action.bottom : null,
+    action.right != null ? action.right : null,
+    action.vertical != null ? action.vertical : null,
+    action.horizontal != null ? action.horizontal : null,
+    color,
+    style
+  );
+
+  return { skipped: false };
+}
+
+/**
+ * auto_resize_columns — Auto-resize a range of columns to fit content.
+ * Expected fields: { type, sheet, startColumn, endColumn }
+ */
+function _execAutoResizeColumns(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  var startCol = _colLetterToNum(action.startColumn);
+  var endCol = _colLetterToNum(action.endColumn);
+  var numCols = endCol - startCol + 1;
+  sheet.autoResizeColumns(startCol, numCols);
+  return { skipped: false };
+}
+
+/**
+ * delete_sheet — Delete a sheet from the workbook.
+ * Safety: skips if it's the last sheet or the active sheet.
+ * Expected fields: { type, sheet }
+ */
+function _execDeleteSheet(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+
+  // Safety: don't delete the last sheet
+  if (ss.getSheets().length <= 1) {
+    return { skipped: true, reason: 'Cannot delete the only remaining sheet' };
+  }
+
+  // Safety: don't delete the active sheet
+  if (sheet.getName() === ss.getActiveSheet().getName()) {
+    return { skipped: true, reason: 'Cannot delete the active sheet "' + action.sheet + '"' };
+  }
+
+  ss.deleteSheet(sheet);
+  return { skipped: false };
+}
+
+/**
+ * set_tab_color — Set a sheet's tab color.
+ * Expected fields: { type, sheet, color }
+ */
+function _execSetTabColor(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  sheet.setTabColor(action.color);
+  return { skipped: false };
+}
+
+/**
+ * add_note — Add a note to a cell.
+ * Expected fields: { type, sheet, cell, note }
+ */
+function _execAddNote(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  sheet.getRange(action.cell).setNote(action.note);
+  return { skipped: false };
+}
+
+/**
+ * move_sheet — Move a sheet to a specific position (1-indexed).
+ * Expected fields: { type, sheet, position }
+ */
+function _execMoveSheet(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  sheet.activate();
+  ss.moveActiveSheet(action.position);
+  return { skipped: false };
+}
+
+/**
  * Convert column letter(s) to a 1-based column number.
  * A=1, Z=26, AA=27, AZ=52, etc.
  */
@@ -414,6 +586,46 @@ function _describeAction(action) {
 
     case 'freeze_rows':
       return 'Freeze top ' + action.rows + ' row' + (action.rows !== 1 ? 's' : '') + ' on ' + action.sheet;
+
+    case 'format_range':
+      var fmtParts2 = [];
+      var fmt2 = action.format || {};
+      if (fmt2.fontColor) fmtParts2.push('color: ' + fmt2.fontColor);
+      if (fmt2.bold) fmtParts2.push('bold');
+      if (fmt2.italic) fmtParts2.push('italic');
+      if (fmt2.numberFormat) fmtParts2.push('format: ' + fmt2.numberFormat);
+      if (fmt2.background || fmt2.backgroundColor) fmtParts2.push('bg: ' + (fmt2.background || fmt2.backgroundColor));
+      if (fmt2.fontSize) fmtParts2.push('size: ' + fmt2.fontSize);
+      if (fmt2.verticalAlignment) fmtParts2.push('vAlign: ' + fmt2.verticalAlignment);
+      if (fmt2.horizontalAlignment) fmtParts2.push('hAlign: ' + fmt2.horizontalAlignment);
+      if (fmt2.wrapStrategy) fmtParts2.push('wrap: ' + fmt2.wrapStrategy);
+      return 'Format ' + action.range + ' on ' + action.sheet + ' (' + fmtParts2.join(', ') + ')';
+
+    case 'set_border':
+      var sides = [];
+      if (action.top) sides.push('top');
+      if (action.bottom) sides.push('bottom');
+      if (action.left) sides.push('left');
+      if (action.right) sides.push('right');
+      if (action.vertical) sides.push('vertical');
+      if (action.horizontal) sides.push('horizontal');
+      return 'Border ' + action.range + ' on ' + action.sheet + ' (' + (sides.join(', ') || 'all') + ', ' + (action.style || 'SOLID') + ')';
+
+    case 'auto_resize_columns':
+      return 'Auto-resize columns ' + action.startColumn + '–' + action.endColumn + ' on ' + action.sheet;
+
+    case 'delete_sheet':
+      return 'Delete sheet "' + action.sheet + '"';
+
+    case 'set_tab_color':
+      return 'Set tab color of "' + action.sheet + '" to ' + action.color;
+
+    case 'add_note':
+      var notePreview = _truncate(action.note, 30);
+      return 'Note on ' + action.cell + ' on ' + action.sheet + ': "' + notePreview + '"';
+
+    case 'move_sheet':
+      return 'Move "' + action.sheet + '" to position ' + action.position;
 
     default:
       return action.type + ' (unknown)';

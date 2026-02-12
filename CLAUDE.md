@@ -43,7 +43,7 @@ crunchy-sheets/
 │
 ├── lib/                          # Shared TypeScript modules
 │   ├── types.ts                  # CellAction, SkillDefinition, AnalyzeRequest/Response
-│   ├── skill-router.ts           # 11 skill definitions with keywords, instructions, model tiers
+│   ├── skill-router.ts           # 13 skill definitions with keywords, instructions, model tiers
 │   ├── action-parser.ts          # Extracts JSON from Claude response, validates actions; formula_xray passthrough
 │   ├── system-prompt.ts          # Builds system prompt with temporal awareness + user role context
 │   ├── auth.ts                   # Google OAuth token verification, Supabase user upsert
@@ -51,11 +51,11 @@ crunchy-sheets/
 │
 ├── apps-script/                  # Google Apps Script add-on (deployed via clasp)
 │   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(), applyActions(), doGet() web app, active sheet override, user role persistence
-│   ├── Sidebar.html              # Chat UI, streaming fetch, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, window toggle (sidebar ↔ browser window)
+│   ├── Sidebar.html              # Chat UI, streaming fetch, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, window toggle, /xray /format /prove slash commands
 │   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core)
 │   ├── ActionExecutor.gs         # Applies CellAction[] to the spreadsheet
 │   ├── OAuth.gs                  # getAuthToken(), checkAuthStatus(), registerUser()
-│   ├── Skills.gs                 # 11 financial skills registry (sidebar dropdown source)
+│   ├── Skills.gs                 # 13 financial skills registry (sidebar dropdown source)
 │   ├── appsscript.json           # Manifest (V8 runtime, America/New_York)
 │   └── .clasp.json               # Bound to test spreadsheet (parentId: 1hzhET6...)
 │
@@ -63,7 +63,7 @@ crunchy-sheets/
 │   ├── src/
 │   │   ├── index.ts              # HTTP entry points: /analyze and /auth (CORS, routing)
 │   │   ├── analyze.ts            # Core handler: auth → skill route → Claude call → parse → track usage
-│   │   ├── skill-router.ts       # 11 skill definitions with keywords, instructions, model tiers
+│   │   ├── skill-router.ts       # 13 skill definitions with keywords, instructions, model tiers
 │   │   ├── action-parser.ts      # Extracts JSON from Claude response, validates each action
 │   │   └── auth.ts               # Google OAuth token verification, Supabase user upsert
 │   ├── package.json
@@ -79,7 +79,7 @@ crunchy-sheets/
 └── README.md
 ```
 
-## 6 Action Types
+## 16 Action Types
 
 Claude returns these in the `actions[]` array. ActionExecutor.gs applies them to the spreadsheet.
 
@@ -87,16 +87,26 @@ Claude returns these in the `actions[]` array. ActionExecutor.gs applies them to
 |------|----------------|--------------|
 | `set_value` | sheet, cell, value | Write a literal value (string/number/boolean) |
 | `set_formula` | sheet, cell, formula | Write a formula (must start with `=`) |
-| `format_cell` | sheet, cell, format | Apply formatting (fontColor, background, bold, numberFormat) |
+| `format_cell` | sheet, cell, format | Apply formatting to a single cell (fontColor, background, bold, numberFormat) |
+| `format_range` | sheet, range, format | Apply formatting to a range (adds verticalAlignment, horizontalAlignment, wrapStrategy, italic, fontSize) |
+| `set_border` | sheet, range | Apply borders (top/bottom/left/right/vertical/horizontal booleans, style, color). Unspecified sides pass `null` (preserve existing) |
+| `auto_resize_columns` | sheet, startColumn, endColumn | Auto-resize columns to fit content (batch API) |
 | `add_sheet` | sheetName | Create a new tab (skips if exists) |
 | `rename_sheet` | sheet, sheetName | Rename existing tab (skips if target name taken) |
+| `delete_sheet` | sheet | Delete a tab (safety: skips last sheet or active sheet) |
 | `add_named_range` | rangeName, rangeA1 | Create/overwrite a named range (supports `Sheet!A1` notation) |
+| `activate_sheet` | sheet | Switch the active sheet (user lands here after Apply) |
+| `set_column_width` | sheet, column, width | Set a column's width in pixels |
+| `freeze_rows` | sheet, rows | Freeze the top N rows |
+| `set_tab_color` | sheet, color | Set a sheet's tab color (hex) |
+| `add_note` | sheet, cell, note | Add a note to a cell |
+| `move_sheet` | sheet, position | Move a sheet to a position (1-indexed) |
 
 Each action is independently try/caught — one failure doesn't stop the batch.
 
-## 11 Financial Skills
+## 13 Financial Skills
 
-Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt → keyword regex auto-detect → default (general analysis, Sonnet).
+Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt → slash command (`/xray`, `/format`, `/prove`) → keyword regex auto-detect → default (general analysis, Sonnet).
 
 | Skill | Model | Category | Notes |
 |-------|-------|----------|-------|
@@ -110,9 +120,21 @@ Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt
 | KPI Dashboard | Sonnet | reporting | |
 | Investor Metrics | Sonnet | reporting | |
 | Budget vs Actual | Sonnet | analysis | |
-| Formula X-Ray | Sonnet | analysis | Read-only; returns `formula_xray` JSON instead of actions |
+| Format & Organize | Sonnet | automation | `/format` — full workbook housekeeping or targeted formatting. Uses `format_range`, `set_border`, `auto_resize_columns`, `set_tab_color`, `move_sheet`, `delete_sheet`, `add_note` |
+| Formula X-Ray | Sonnet | analysis | `/xray` — read-only; returns `formula_xray` JSON instead of actions |
+| Prove It | Opus | analysis | `/prove` — builds auditable proof tab tracing numbers to source cells |
 
 Sonnet skills are fast/cheap. Opus skills require deeper reasoning. Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip }` — that bypasses action validation and renders as a color-coded card in the sidebar.
+
+### Slash Commands
+
+| Command | Skill | Example |
+|---------|-------|---------|
+| `/xray [cell]` | formula_xray | `/xray B14` or bare `/xray` (picks most complex formula) |
+| `/format [instruction]` | workbook_format | `/format` (full sweep) or `/format just the header row` |
+| `/prove [text]` | prove_it | `/prove show your work` |
+
+Slash commands set `selectedSkill` explicitly, bypassing keyword regex matching.
 
 ## Financial Formatting Conventions (non-negotiable)
 

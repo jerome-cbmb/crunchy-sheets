@@ -288,3 +288,20 @@ function saveUserRole(role) {
 function getUserRole() {
   return PropertiesService.getUserProperties().getProperty('userRole');
 }
+
+// ─── Cell Navigation ─────────────────────────────────────────────────────────
+
+/**
+ * Navigate to a specific cell in the spreadsheet.
+ * Used by clickable cell references in chat and "View Proof" links.
+ *
+ * @param {string} sheetName - Target sheet name (empty string = active sheet).
+ * @param {string} cellRef - A1-notation cell reference (e.g., "B14" or "A1:C5").
+ */
+function navigateToCell(sheetName, cellRef) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = sheetName ? ss.getSheetByName(sheetName) : ss.getActiveSheet();
+  if (!sheet) sheet = ss.getActiveSheet();
+  SpreadsheetApp.setActiveSheet(sheet);
+  if (cellRef) sheet.setActiveSelection(cellRef);
+}

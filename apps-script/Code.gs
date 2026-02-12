@@ -79,9 +79,7 @@ function doGet(e) {
  * @return {string} The web app URL.
  */
 function getWebAppUrl() {
-  var url = ScriptApp.getService().getUrl();
-  if (!url) throw new Error('No web app deployment found. Deploy the script as a web app first.');
-  return url;
+  return ScriptApp.getService().getUrl();
 }
 
 /**
@@ -250,8 +248,9 @@ function runHealthCheck() {
  */
 function openExpandedView() {
   var html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setWidth(600)
-    .setHeight(700);
+    .append('<script>var isDialogMode = true;</script>')
+    .setWidth(700)
+    .setHeight(750);
   SpreadsheetApp.getUi().showModelessDialog(html, 'Crunchy Sheets');
 }
 

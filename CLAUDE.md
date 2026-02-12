@@ -50,7 +50,7 @@ crunchy-sheets/
 │   └── usage.ts                  # Token usage tracking to Supabase
 │
 ├── apps-script/                  # Google Apps Script add-on (deployed via clasp)
-│   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(), applyActions(), doGet() web app, active sheet override, user role persistence
+│   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(), applyActions(), openExpandedView() modeless dialog, user role persistence
 │   ├── Sidebar.html              # Chat UI, streaming fetch, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, window toggle, /xray /format /prove slash commands
 │   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core)
 │   ├── ActionExecutor.gs         # Applies CellAction[] to the spreadsheet
@@ -248,4 +248,4 @@ RLS enabled on all tables, service role bypasses.
 - **Temporal awareness:** System prompt includes today's date. Claude says "most recent actuals (through [period])" instead of "current state ([period])". Notes stale data (>6 months old).
 - **Neutral language:** System prompt instructs "this model shows..." not "your forecast...". User role (if set) adjusts tone — builder gets technical directness, reviewer gets risk flags, inherited gets structural explanations.
 - **Onboarding:** First-use card asks user role (builder/reviewer/inherited/exploring). Saved to `UserProperties`, sent as `userRole` in every request. Role persists across sessions.
-- **Separate browser window:** ↗ button opens a real Chrome window via `window.open()` to the deployed web app URL (`doGet()` serves Sidebar.html). Chat state and active sheet context transfer via `UserProperties`. `isWebAppMode` detection (`window.top === window.self`) swaps the button to ← for closing. `saveChatState()` truncates to 8KB to stay within UserProperties limits.
+- **Expanded view:** ↗ button opens a 700×750 modeless dialog via `showModelessDialog()` — stays container-bound, no scope escalation needed. `isDialogMode` flag (injected by `openExpandedView()`) swaps the button to ← for returning to sidebar. Chat state transfers bidirectionally via `UserProperties`. `saveChatState()` truncates to 8KB to stay within UserProperties limits.

@@ -703,6 +703,15 @@
         // Sidebar mode: pre-fetch web app URL for popup-blocker avoidance
         google.script.run
           .withSuccessHandler(function(url) { webAppUrl = url; })
+          .withFailureHandler(function(err) {
+            console.warn('getWebAppUrl failed:', err);
+            // Retry once after 2s
+            setTimeout(function() {
+              google.script.run
+                .withSuccessHandler(function(url) { webAppUrl = url; })
+                .getWebAppUrl();
+            }, 2000);
+          })
           .getWebAppUrl();
       }
 
@@ -1717,7 +1726,20 @@
       } else {
         // Expand: open real browser window
         if (!webAppUrl) {
-          addMessage('Web app URL not ready. Try again in a moment.', 'system');
+          addMessage('Fetching web app URL\u2026', 'system');
+          google.script.run
+            .withSuccessHandler(function(url) {
+              if (url) {
+                webAppUrl = url;
+                addMessage('Ready \u2014 click \u2197 again to open.', 'system');
+              } else {
+                addMessage('Web app not deployed. Run Deploy \u2192 New deployment \u2192 Web app in the Apps Script editor.', 'system');
+              }
+            })
+            .withFailureHandler(function(err) {
+              addMessage('Could not get web app URL: ' + err.message, 'system');
+            })
+            .getWebAppUrl();
           return;
         }
         // Step 1: open window synchronously (popup-blocker safe)

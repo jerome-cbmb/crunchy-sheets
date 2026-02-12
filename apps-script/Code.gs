@@ -79,7 +79,9 @@ function doGet(e) {
  * @return {string} The web app URL.
  */
 function getWebAppUrl() {
-  return ScriptApp.getService().getUrl();
+  var url = ScriptApp.getService().getUrl();
+  if (!url) throw new Error('No web app deployment found. Deploy the script as a web app first.');
+  return url;
 }
 
 /**

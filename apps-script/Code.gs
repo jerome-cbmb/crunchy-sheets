@@ -171,10 +171,15 @@ function analyzeWorkbook(userPrompt) {
  * @param {string} userPrompt - The user's question or instruction.
  * @return {Object} Payload for the Vercel /analyze endpoint.
  */
-function getAnalyzePayload(userPrompt, activeSheetOverride) {
+function getAnalyzePayload(userPrompt, activeSheetOverride, skillHint) {
   var state = serializeWorkbookState(activeSheetOverride || null);
   var token = ScriptApp.getOAuthToken();
   var userRole = getUserRole();
+
+  var crossRefGraph = null;
+  if (skillHint === 'tab_audit') {
+    crossRefGraph = buildCrossRefGraph();
+  }
 
   return {
     workbookState: state,
@@ -182,7 +187,8 @@ function getAnalyzePayload(userPrompt, activeSheetOverride) {
     token: token,
     spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
     userEmail: Session.getActiveUser().getEmail(),
-    userRole: userRole || undefined
+    userRole: userRole || undefined,
+    crossRefGraph: crossRefGraph
   };
 }
 

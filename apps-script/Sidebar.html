@@ -792,6 +792,19 @@
         });
       }
 
+      // /audit shortcut
+      var auditMatch = text.match(/^\/audit\s*(.*)/i);
+      if (auditMatch) {
+        var auditInstruction = auditMatch[1].trim();
+        text = auditInstruction
+          ? 'Audit tabs: ' + auditInstruction
+          : 'Run a full tab audit on this workbook';
+        selectedSkill = 'tab_audit';
+        document.querySelectorAll('.skill-chip').forEach(function(c) {
+          c.classList.toggle('active', c.dataset.id === 'tab_audit');
+        });
+      }
+
       addMessage(text, 'user');
       input.value = '';
       setLoading(true);
@@ -829,7 +842,7 @@
           setLoading(false);
           addMessage('⚠ Error preparing request: ' + err.message, 'system');
         })
-        .getAnalyzePayload(fullPrompt);
+        .getAnalyzePayload(fullPrompt, null, selectedSkill || null);
     }
 
     // ─── Streaming ───────────────────────────────────────────────────────
@@ -896,7 +909,8 @@
             spreadsheetId: payload.spreadsheetId,
             userEmail: payload.userEmail,
             userRole: payload.userRole,
-            skill: selectedSkill || undefined
+            skill: selectedSkill || undefined,
+            crossRefGraph: payload.crossRefGraph || undefined
           })
         });
 

@@ -106,6 +106,13 @@ var SKILLS = [
     description: 'Build an auditable proof tab tracing every claimed number back to source cells.',
     modelTier: 'opus',
     category: 'analysis'
+  },
+  {
+    id: 'tab_audit',
+    name: 'Tab Audit',
+    description: 'Identify unused, orphan, and scratch tabs. Color-code by status.',
+    modelTier: 'sonnet',
+    category: 'automation'
   }
 ];
 

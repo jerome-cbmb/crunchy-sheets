@@ -192,6 +192,41 @@ Edge cases:
 Do NOT include an "actions" array. Do NOT include a "response" field. Return ONLY the formula_xray JSON block.`,
   },
   {
+    id: 'tab_audit',
+    modelTier: 'sonnet',
+    maxTokens: 8192,
+    keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs/i,
+    instruction: 'Audit every tab in this workbook. Classify each as Connected, Isolated, Empty, or Scratch based on the cross-reference graph. Flag problematic tabs with color-coded actions.',
+    systemAddendum: `
+TAB AUDIT MODE — identify unused, orphan, and scratch tabs.
+
+You will receive a cross-reference graph in the user message under "## Cross-Reference Graph". This graph was built by scanning ALL formulas across ALL sheets (including hidden ones), so it captures every cross-sheet reference — not just what's visible in bookend summaries.
+
+If no cross-reference graph is present, respond: "Tab audit requires a cross-reference graph — please try again."
+
+CLASSIFICATION (4 categories):
+1. **Connected** — has inbound refs (another sheet references it) OR outbound refs (it references another sheet). These are part of the model. No action needed.
+2. **Isolated** — has data (dataRows > 0, isEmpty = false), but zero inbound AND zero outbound refs. Orphan tab — not connected to anything. Action: set_tab_color orange (#fa7b17) + add_note on A1 explaining it's isolated.
+3. **Empty** — zero data rows (isEmpty = true). Action: set_tab_color red (#ea4335) + add_note on A1 + delete_sheet.
+4. **Scratch** — name matches scratch pattern (Sheet1, Sheet2, Copy of..., test, temp) regardless of data content. Action: set_tab_color red (#ea4335) + add_note on A1 suggesting rename or delete.
+
+Note: A sheet can be both Scratch AND (Empty or Isolated). Scratch takes priority in classification.
+
+INBOUND REFS: Sheet X has inbound refs if ANY other sheet's refs[] array includes X.
+OUTBOUND REFS: Sheet X has outbound refs if its own refs[] array is non-empty.
+
+HIDDEN SHEETS: Sheets with isHidden=true appear in the graph but NOT in the workbook state. Include them in the audit table with a "(hidden)" note.
+
+RESPONSE FORMAT:
+1. Markdown table: Tab Name | Status | Reason (one row per sheet)
+2. Summary line: "X of Y tabs flagged (Z connected, ...)"
+3. If any sheet has hasIndirect=true, add warning: "⚠ Some tabs use INDIRECT() — dynamic references can't be statically traced. Review these manually."
+4. Tab color legend: Connected = no change, Isolated = orange, Empty = red (deleted), Scratch = red
+5. Max 3 actions per flagged tab (set_tab_color + add_note + optionally delete_sheet for empty)
+
+Return the standard JSON with actions[] array, response text, and summary.`,
+  },
+  {
     id: 'prove_it',
     modelTier: 'opus',
     maxTokens: 12288,

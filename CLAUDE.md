@@ -17,13 +17,13 @@ User clicks "Apply All" → google.script.run.applyActions(actions)
 
 The sidebar calls Vercel directly via `fetch()` with streaming (`ReadableStream`). Apps Script handles workbook serialization, auth token retrieval, and action execution — but the AI call bypasses Apps Script entirely.
 
-**RLM (Runtime Language Model):** The workbook is serialized into a single JSON state string on every request using **tiered serialization**: the active sheet gets full cell data, other sheets get headers + bookend rows (first 3 + last 3, capped at 8 columns). No RAG, no chunking, no repeated lookups. Claude reasons over full active sheet + structural summaries of all other tabs.
+**RLM (Runtime Language Model):** The workbook is serialized into a single JSON state string on every request using **tiered serialization with adaptive budget**. By default: active sheet gets full cell data, other sheets get headers + bookend rows (first 3 + last 3, capped at 8 columns). If the total exceeds the 120K token budget, the active sheet is gracefully degraded — first to a truncated view (headers + 30 top rows + 10 bottom rows, all columns), then to a summary if still over budget. A `truncationNote` tells Claude when context was clipped. Vercel keeps a 150K hard guard as a safety net. No RAG, no chunking, no repeated lookups.
 
 ## Data Flow (happy path)
 
 1. First open: onboarding card asks user role (builder/reviewer/inherited/exploring) → saved to `UserProperties`
-2. User types in sidebar → `send()` calls `google.script.run.getAnalysisPayload(prompt)` to get serialized state + token
-3. Sidebar calls `fetch(VERCEL_API_BASE + '/api/analyze', ...)` directly with streaming
+2. User types in sidebar → `send()` calls `google.script.run.getAnalyzePayload(prompt, null, skillHint)` to get serialized state + token (+ cross-ref graph if `/audit`)
+3. Sidebar calls `fetch(VERCEL_API_BASE + '/api/analyze', ...)` directly with streaming, including `crossRefGraph` if present
 4. `route.ts` verifies Google OAuth token, routes to skill, builds system prompt with role context, calls Claude via streaming API
 5. Claude streams JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` for X-Ray skill)
 6. Sidebar renders response progressively as chunks arrive via `ReadableStream`
@@ -43,19 +43,19 @@ crunchy-sheets/
 │
 ├── lib/                          # Shared TypeScript modules
 │   ├── types.ts                  # CellAction, SkillDefinition, AnalyzeRequest/Response
-│   ├── skill-router.ts           # 13 skill definitions with keywords, instructions, model tiers
+│   ├── skill-router.ts           # 14 skill definitions with keywords, instructions, model tiers
 │   ├── action-parser.ts          # Extracts JSON from Claude response, validates actions; formula_xray passthrough
 │   ├── system-prompt.ts          # Builds system prompt with temporal awareness + user role context
 │   ├── auth.ts                   # Google OAuth token verification, Supabase user upsert
 │   └── usage.ts                  # Token usage tracking to Supabase
 │
 ├── apps-script/                  # Google Apps Script add-on (deployed via clasp)
-│   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(), applyActions(), openExpandedView() modeless dialog, user role persistence
-│   ├── Sidebar.html              # Chat UI, streaming fetch, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, window toggle, /xray /format /prove slash commands
-│   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core)
+│   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(prompt, activeSheetOverride, skillHint), applyActions(), openExpandedView() modeless dialog, user role persistence
+│   ├── Sidebar.html              # Chat UI, streaming fetch, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, window toggle, /xray /format /prove /audit slash commands
+│   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core) with adaptive token budget + buildCrossRefGraph() for tab audit
 │   ├── ActionExecutor.gs         # Applies CellAction[] to the spreadsheet
 │   ├── OAuth.gs                  # getAuthToken(), checkAuthStatus(), registerUser()
-│   ├── Skills.gs                 # 13 financial skills registry (sidebar dropdown source)
+│   ├── Skills.gs                 # 14 financial skills registry (sidebar dropdown source)
 │   ├── appsscript.json           # Manifest (V8 runtime, America/New_York)
 │   └── .clasp.json               # Bound to test spreadsheet (parentId: 1hzhET6...)
 │
@@ -63,7 +63,7 @@ crunchy-sheets/
 │   ├── src/
 │   │   ├── index.ts              # HTTP entry points: /analyze and /auth (CORS, routing)
 │   │   ├── analyze.ts            # Core handler: auth → skill route → Claude call → parse → track usage
-│   │   ├── skill-router.ts       # 13 skill definitions with keywords, instructions, model tiers
+│   │   ├── skill-router.ts       # 14 skill definitions with keywords, instructions, model tiers
 │   │   ├── action-parser.ts      # Extracts JSON from Claude response, validates each action
 │   │   └── auth.ts               # Google OAuth token verification, Supabase user upsert
 │   ├── package.json
@@ -104,9 +104,9 @@ Claude returns these in the `actions[]` array. ActionExecutor.gs applies them to
 
 Each action is independently try/caught — one failure doesn't stop the batch.
 
-## 13 Financial Skills
+## 14 Financial Skills
 
-Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt → slash command (`/xray`, `/format`, `/prove`) → keyword regex auto-detect → default (general analysis, Sonnet).
+Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt → slash command (`/xray`, `/format`, `/prove`, `/audit`) → keyword regex auto-detect → default (general analysis, Sonnet).
 
 | Skill | Model | Category | Notes |
 |-------|-------|----------|-------|
@@ -123,8 +123,9 @@ Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt
 | Format & Organize | Sonnet | automation | `/format` — full workbook housekeeping or targeted formatting. Uses `format_range`, `set_border`, `auto_resize_columns`, `set_tab_color`, `move_sheet`, `delete_sheet`, `add_note` |
 | Formula X-Ray | Sonnet | analysis | `/xray` — read-only; returns `formula_xray` JSON instead of actions |
 | Prove It | Opus | analysis | `/prove` — builds auditable proof tab tracing numbers to source cells |
+| Tab Audit | Sonnet | automation | `/audit` — scans cross-ref graph to classify tabs as Connected/Isolated/Empty/Scratch. Color-codes flags with `set_tab_color`, `add_note`, `delete_sheet` |
 
-Sonnet skills are fast/cheap. Opus skills require deeper reasoning. Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip }` — that bypasses action validation and renders as a color-coded card in the sidebar.
+Sonnet skills are fast/cheap. Opus skills require deeper reasoning. Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip }` — that bypasses action validation and renders as a color-coded card in the sidebar. Tab Audit uses a conditional `crossRefGraph` payload — `buildCrossRefGraph()` in WorkbookState.gs scans ALL sheets (including hidden) for cross-sheet formula refs + named range edges, only when `skillHint === 'tab_audit'`.
 
 ### Slash Commands
 
@@ -133,8 +134,9 @@ Sonnet skills are fast/cheap. Opus skills require deeper reasoning. Formula X-Ra
 | `/xray [cell]` | formula_xray | `/xray B14` or bare `/xray` (picks most complex formula) |
 | `/format [instruction]` | workbook_format | `/format` (full sweep) or `/format just the header row` |
 | `/prove [text]` | prove_it | `/prove show your work` |
+| `/audit [instruction]` | tab_audit | `/audit` (full sweep) or `/audit just check hidden tabs` |
 
-Slash commands set `selectedSkill` explicitly, bypassing keyword regex matching.
+Slash commands set `selectedSkill` explicitly, bypassing keyword regex matching. `/audit` also passes `skillHint` to `getAnalyzePayload()`, triggering `buildCrossRefGraph()` on the Apps Script side before the request reaches Vercel.
 
 ## Financial Formatting Conventions (non-negotiable)
 
@@ -238,7 +240,7 @@ RLS enabled on all tables, service role bypasses.
 ## Key Design Decisions
 
 - **Streaming via Vercel:** Sidebar calls Vercel directly via `fetch()` + `ReadableStream`. Response renders progressively — no waiting for full completion. Apps Script is bypassed for the AI call (only used for workbook serialization and action execution).
-- **Tiered serialization:** Active sheet = full cell data. Other sheets = headers + 3+3 bookend rows, capped at 8 columns. Hidden sheets skipped. Target: ~25-40K tokens for an 8-tab SaaS model. Token guard at 150K rejects oversized payloads before calling Claude.
+- **Tiered serialization with adaptive budget:** Active sheet = full cell data. Other sheets = headers + 3+3 bookend rows, capped at 8 columns. Hidden sheets skipped. Target: ~25-40K tokens for an 8-tab SaaS model. If total exceeds 120K budget (e.g., after Prove It creates a large proof tab), the active sheet is degraded to truncated (headers + 30/10 rows) or summary. Vercel keeps a 150K hard guard as a safety net.
 - **No RAG:** Single JSON state per request. Simpler, more accurate than chunking.
 - **Actions require confirmation:** Claude returns proposed actions → sidebar shows preview → user clicks "Apply All" before anything touches the spreadsheet.
 - **Skill routing is layered:** Explicit sidebar selection takes priority, then `[skill:xxx]` prefix, then keyword auto-detect, then default.

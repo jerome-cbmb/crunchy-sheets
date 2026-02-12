@@ -49,13 +49,13 @@ export async function POST(req: NextRequest) {
   const estimatedTokens = Math.ceil(workbookStateStr.length / 4);
   if (estimatedTokens > 150000) {
     return new Response(
-      `Workbook context too large (~${Math.round(estimatedTokens / 1000)}K tokens). Try switching to a smaller tab.`,
+      `Workbook context too large (~${Math.round(estimatedTokens / 1000)}K tokens) even after adaptive truncation. Try switching to a smaller tab or closing large proof/output tabs.`,
       { status: 413, headers: corsHeaders }
     );
   }
 
   // 5. Build user message
-  const userMessage = buildUserMessage(body.prompt, workbookStateStr, skillContext, body.userRole);
+  const userMessage = buildUserMessage(body.prompt, workbookStateStr, skillContext, body.userRole, body.crossRefGraph);
 
   // 6. Select model
   const modelId = skillContext.modelTier === 'opus'
@@ -88,7 +88,8 @@ function buildUserMessage(
   prompt: string,
   workbookState: string,
   skill: SkillContext,
-  userRole?: string
+  userRole?: string,
+  crossRefGraph?: any
 ): string {
   let msg = '';
 
@@ -107,6 +108,11 @@ function buildUserMessage(
   }
 
   msg += `## Current Workbook State\n\`\`\`json\n${workbookState}\n\`\`\`\n\n`;
+
+  if (crossRefGraph) {
+    msg += `## Cross-Reference Graph\n\`\`\`json\n${JSON.stringify(crossRefGraph)}\n\`\`\`\n\n`;
+  }
+
   msg += `## User Request\n${prompt}`;
 
   return msg;

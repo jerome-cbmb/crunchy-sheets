@@ -68,6 +68,7 @@ export interface AnalyzeRequest {
   spreadsheetId: string;
   userEmail: string;
   userRole?: string;
+  crossRefGraph?: any;
 }
 
 export interface AnalyzeResponse {

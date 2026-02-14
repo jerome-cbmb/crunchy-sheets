@@ -154,13 +154,13 @@ Slash commands set `selectedSkill` explicitly, bypassing keyword regex matching.
 
 ## Financial Formatting Conventions (non-negotiable)
 
-| Role | Font Color | Hex | Example |
-|------|-----------|-----|---------|
-| Hard-coded inputs | Blue | `#0000FF` | Revenue growth rate: 15% |
-| Formulas | Black | `#000000` | `=B2*(1+B3)` |
-| Cross-tab references | Green | `#008000` | `=Assumptions!B5` |
+| Role | Font Color | Background | Hex | Example |
+|------|-----------|------------|-----|---------|
+| Hard-coded inputs | Blue | — | `#082FFF` | Revenue growth rate: 15% |
+| Key model drivers | Blue | Yellow | `#082FFF` + `#FFF2CC` | Discount rate, scenario toggle |
+| Formulas (all, including cross-tab) | Black | — | `#000000` | `=B2*(1+B3)`, `=Assumptions!B5` |
 
-WorkbookState.gs detects these colors and tags cells with `role: 'input'`, `'formula'`, or `'crossref'`.
+WorkbookState.gs detects these colors and tags cells with `role: 'input'` or `'formula'`.
 
 ## Commands
 

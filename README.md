@@ -156,11 +156,11 @@ curl -X POST http://localhost:8080 \
 
 Financial analyst conventions (non-negotiable):
 
-| Element | Font Color | Example |
-|---------|-----------|---------|
-| Hard-coded inputs | Blue `#0000FF` | Revenue growth rate: 15% |
-| Formulas | Black `#000000` | `=B2*(1+B3)` |
-| Cross-tab references | Green `#008000` | `=Assumptions!B5` |
+| Element | Font Color | Background | Example |
+|---------|-----------|------------|---------|
+| Hard-coded inputs | Blue `#082FFF` | — | Revenue growth rate: 15% |
+| Key model drivers | Blue `#082FFF` | Yellow `#FFF2CC` | Discount rate, scenario toggle |
+| Formulas (all) | Black `#000000` | — | `=B2*(1+B3)`, `=Assumptions!B5` |
 
 ## Pricing
 

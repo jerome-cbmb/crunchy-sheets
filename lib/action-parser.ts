@@ -207,7 +207,7 @@ When you modify a workbook, return your response as a JSON object with this stru
   "actions": [
     { "type": "set_value", "sheet": "SheetName", "cell": "A1", "value": "Revenue" },
     { "type": "set_formula", "sheet": "SheetName", "cell": "A2", "formula": "=A1*1.1" },
-    { "type": "format_cell", "sheet": "SheetName", "cell": "A1", "format": { "fontColor": "#0000FF", "bold": true } },
+    { "type": "format_cell", "sheet": "SheetName", "cell": "A1", "format": { "fontColor": "#082FFF", "bold": true } },
     { "type": "add_sheet", "sheetName": "Dashboard", "tabColor": "#1e8e3e" },
     { "type": "add_named_range", "rangeName": "Revenue_Growth", "rangeA1": "Assumptions!B5" },
     { "type": "activate_sheet", "sheet": "Dashboard" },

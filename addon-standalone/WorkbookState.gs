@@ -115,12 +115,10 @@ function _serializeSheet(sheet) {
 
       // Detect cell role from font color (financial analyst convention)
       var color = fontColors[r][c];
-      if (color === '#0000ff' || color === '#0000FF') {
+      if (color === '#0000ff' || color === '#0000FF' || color === '#082fff' || color === '#082FFF') {
         cell.role = 'input'; // Blue = hard-coded input
-      } else if (color === '#008000' || color === '#008000') {
-        cell.role = 'crossref'; // Green = cross-tab reference
       } else if (formula) {
-        cell.role = 'formula'; // Black formula
+        cell.role = 'formula'; // Black formula (includes cross-tab refs)
       }
 
       cells.push(cell);
@@ -210,10 +208,8 @@ function _serializeSheetTruncated(sheet) {
       }
 
       var color = fontColors[r][c];
-      if (color === '#0000ff' || color === '#0000FF') {
+      if (color === '#0000ff' || color === '#0000FF' || color === '#082fff' || color === '#082FFF') {
         cell.role = 'input';
-      } else if (color === '#008000') {
-        cell.role = 'crossref';
       } else if (formula) {
         cell.role = 'formula';
       }
@@ -308,10 +304,8 @@ function _serializeSheetSummary(sheet) {
       }
 
       var color = fontColors[r][c];
-      if (color === '#0000ff' || color === '#0000FF') {
+      if (color === '#0000ff' || color === '#0000FF' || color === '#082fff' || color === '#082FFF') {
         cell.role = 'input';
-      } else if (color === '#008000') {
-        cell.role = 'crossref';
       } else if (formula) {
         cell.role = 'formula';
       }
@@ -687,10 +681,8 @@ function fetchRangeData(requests) {
           }
 
           var color = fontColors[r][c];
-          if (color === '#0000ff' || color === '#0000FF') {
+          if (color === '#0000ff' || color === '#0000FF' || color === '#082fff' || color === '#082FFF') {
             cell.role = 'input';
-          } else if (color === '#008000') {
-            cell.role = 'crossref';
           } else if (formula) {
             cell.role = 'formula';
           }

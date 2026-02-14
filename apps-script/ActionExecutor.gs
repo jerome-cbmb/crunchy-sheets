@@ -14,9 +14,9 @@
  *   - add_named_range: Create a named range
  *
  * Financial formatting conventions:
- *   Blue (#0000FF)  → hard-coded inputs
- *   Black (#000000) → formulas
- *   Green (#008000) → cross-tab references
+ *   Blue (#082FFF)  → hard-coded inputs
+ *   Blue (#082FFF) + Yellow bg (#FFF2CC) → key model drivers
+ *   Black (#000000) → formulas (all, including cross-tab references)
  */
 
 /**

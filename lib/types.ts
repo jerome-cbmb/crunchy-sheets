@@ -48,6 +48,7 @@ export interface SkillContext {
   instruction: string;
   systemAddendum: string;
   maxTokens: number;
+  useFullContext?: boolean;
 }
 
 export interface SkillDefinition {
@@ -57,18 +58,36 @@ export interface SkillDefinition {
   keywords: RegExp;
   instruction: string;
   systemAddendum: string;
+  useFullContext?: boolean;
+}
+
+// ─── Two-Pass Architecture ──────────────────────────────────────────────────
+
+export interface DataRequest {
+  ranges: { sheet: string; range: string; reason: string }[];
+  question: string;
+}
+
+export interface ConversationEntry {
+  role: 'user' | 'assistant';
+  content: string;
+  fetchedRanges?: string[];
 }
 
 // ─── Request / Response ────────────────────────────────────────────────────
 
 export interface AnalyzeRequest {
-  workbookState: any;
+  workbookState?: any;
   prompt: string;
   skill?: string;
   spreadsheetId: string;
   userEmail: string;
   userRole?: string;
   crossRefGraph?: any;
+  structuralModel?: any;
+  isStructuralPass?: boolean;
+  conversationHistory?: ConversationEntry[];
+  requestedData?: Record<string, any>;
 }
 
 export interface AnalyzeResponse {

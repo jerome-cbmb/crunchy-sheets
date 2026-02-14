@@ -5,7 +5,7 @@ import { verifyGoogleToken } from '@/lib/auth';
 import { routeToSkill } from '@/lib/skill-router';
 import { buildSystemPrompt } from '@/lib/system-prompt';
 import { trackUsage } from '@/lib/usage';
-import { AnalyzeRequest, SkillContext } from '@/lib/types';
+import { AnalyzeRequest, SkillContext, ConversationEntry } from '@/lib/types';
 
 export const maxDuration = 60;
 
@@ -45,8 +45,10 @@ export async function POST(req: NextRequest) {
   const skillContext = routeToSkill(body.prompt, body.skill);
 
   // 4. Token guard
-  const workbookStateStr = JSON.stringify(body.workbookState);
-  const estimatedTokens = Math.ceil(workbookStateStr.length / 4);
+  const contextStr = body.isStructuralPass
+    ? JSON.stringify(body.structuralModel || '') + JSON.stringify(body.requestedData || '') + JSON.stringify(body.conversationHistory || '')
+    : JSON.stringify(body.workbookState || '');
+  const estimatedTokens = Math.ceil(contextStr.length / 4);
   if (estimatedTokens > 150000) {
     return new Response(
       `Workbook context too large (~${Math.round(estimatedTokens / 1000)}K tokens) even after adaptive truncation. Try switching to a smaller tab or closing large proof/output tabs.`,
@@ -55,7 +57,9 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Build user message
-  const userMessage = buildUserMessage(body.prompt, workbookStateStr, skillContext, body.userRole, body.crossRefGraph);
+  const userMessage = body.isStructuralPass
+    ? buildStructuralUserMessage(body.prompt, body.structuralModel, skillContext, body.userRole, body.requestedData, body.conversationHistory)
+    : buildUserMessage(body.prompt, JSON.stringify(body.workbookState), skillContext, body.userRole, body.crossRefGraph);
 
   // 6. Select model
   const modelId = skillContext.modelTier === 'opus'
@@ -111,6 +115,52 @@ function buildUserMessage(
 
   if (crossRefGraph) {
     msg += `## Cross-Reference Graph\n\`\`\`json\n${JSON.stringify(crossRefGraph)}\n\`\`\`\n\n`;
+  }
+
+  msg += `## User Request\n${prompt}`;
+
+  return msg;
+}
+
+function buildStructuralUserMessage(
+  prompt: string,
+  structuralModel: any,
+  skill: SkillContext,
+  userRole?: string,
+  requestedData?: Record<string, any>,
+  conversationHistory?: ConversationEntry[]
+): string {
+  let msg = '';
+
+  if (userRole) {
+    const roleDescriptions: Record<string, string> = {
+      builder: 'The user built or maintains this model. Be direct and technical.',
+      reviewer: 'The user is reviewing or auditing this model. Focus on risks and flags.',
+      inherited: 'The user inherited this model from someone else. Help them understand it.',
+      exploring: 'The user is exploring this model. Be descriptive about structure and purpose.',
+    };
+    msg += `[User Role: ${userRole}] ${roleDescriptions[userRole] || ''}\n\n`;
+  }
+
+  if (skill.skillId) {
+    msg += `[Active Skill: ${skill.skillId}]\n${skill.instruction}\n\n`;
+  }
+
+  msg += `## Workbook Structure\n\`\`\`json\n${JSON.stringify(structuralModel)}\n\`\`\`\n\n`;
+
+  if (requestedData) {
+    msg += `## Requested Cell Data\n\`\`\`json\n${JSON.stringify(requestedData)}\n\`\`\`\n\n`;
+  }
+
+  if (conversationHistory && conversationHistory.length > 0) {
+    msg += `## Previous Exchanges\n`;
+    for (const entry of conversationHistory) {
+      msg += `**${entry.role}:** ${entry.content}`;
+      if (entry.fetchedRanges && entry.fetchedRanges.length > 0) {
+        msg += ` [fetched: ${entry.fetchedRanges.join(', ')}]`;
+      }
+      msg += '\n\n';
+    }
   }
 
   msg += `## User Request\n${prompt}`;

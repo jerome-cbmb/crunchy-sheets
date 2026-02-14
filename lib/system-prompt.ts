@@ -49,5 +49,23 @@ USER CONTEXT:
   - Inherited: help them understand structure and assumptions
   - Exploring: be descriptive, explain what each tab does
 
-${buildActionInstructions()}`;
+${buildActionInstructions()}
+
+TWO-PASS DATA PROTOCOL:
+When you receive "Workbook Structure" (not full cell data), choose:
+
+OPTION A — ANSWER DIRECTLY when structure + samples are sufficient:
+- Workbook organization, tab purposes, model overview
+- Questions answerable from headers, sample values, key formulas
+- Greetings or non-data questions
+
+OPTION B — REQUEST SPECIFIC DATA:
+Return a JSON code block:
+\`\`\`json
+{ "type": "data_request", "ranges": [{"sheet": "P&L", "range": "A1:H50", "reason": "Need full P&L data for revenue analysis"}], "question": "restated question" }
+\`\`\`
+
+Rules: minimum data needed, max 5 ranges, one request per question.
+If you have full workbook state (## Current Workbook State), never return data_request.
+If prior exchanges show data was already fetched, don't re-request it.`;
 }

@@ -5,32 +5,46 @@ AI CFO for Google Sheets. Understands workbook structure, thinks like a financia
 ## Architecture
 
 ```
-Sidebar (HTML/JS)  ──fetch()──→  Vercel /api/analyze  →  Claude API (streaming)
-                                                              ↓
-                                              streamed JSON { actions[], response }
-                                                              ↓
-Sidebar preview  ←──────── ReadableStream chunks ──────────── ←
+Sidebar (HTML/JS) → getStructuralPayload() → Vercel /api/analyze → Claude API (streaming)
+                                                                          ↓
+                                                          streamed JSON { actions[], response }
+                                                          — OR —
+                                                          { type: "data_request", ranges[] }
+                                                                          ↓
+                    ← ReadableStream ← ─────────────────────────────────── ←
+                          ↓
+                    If data_request: fetchRangeData() → Pass 2 → stream again
+                    If direct answer: render + actions panel
 
 User clicks "Apply All" → google.script.run.applyActions(actions)
                              → ActionExecutor.gs writes to spreadsheet
 ```
 
-The sidebar calls Vercel directly via `fetch()` with streaming (`ReadableStream`). Apps Script handles workbook serialization, auth token retrieval, and action execution — but the AI call bypasses Apps Script entirely.
+**Two-pass "Understand Then Look" architecture.** Most requests use a lightweight structural model (~2-5K tokens) instead of full workbook serialization. Claude sees headers, sample values, and key formulas — enough to answer structural questions directly or request specific ranges for deeper analysis.
 
-**RLM (Runtime Language Model):** The workbook is serialized into a single JSON state string on every request using **tiered serialization with adaptive budget**. By default: active sheet gets full cell data, other sheets get headers + bookend rows (first 3 + last 3, capped at 8 columns). If the total exceeds the 120K token budget, the active sheet is gracefully degraded — first to a truncated view (headers + 30 top rows + 10 bottom rows, all columns), then to a summary if still over budget. A `truncationNote` tells Claude when context was clipped. Vercel keeps a 150K hard guard as a safety net. No RAG, no chunking, no repeated lookups.
+**Pass 1 (structural):** `getStructuralPayload()` returns cached metadata built from targeted reads (2 header rows, 3 sample rows, 1 formula row per sheet — no full-sheet `getDataRange()`). If Claude needs more data, it returns a `data_request` JSON with specific ranges.
+
+**Pass 2 (targeted):** Sidebar calls `fetchRangeData()` to read only the requested cells, then streams a second request with that data appended.
+
+**Full-context fallback:** Four skills (`workbook_format`, `prove_it`, `tab_audit`, `formula_xray`) always use full serialization via `getAnalyzePayload()`. The routing happens server-side in `getStructuralPayload()` based on a `fullContextSkills` map.
+
+**Full serialization (RLM):** Still available for full-context skills. Active sheet gets full cell data, other sheets get headers + bookend rows (first 3 + last 3, capped at 8 columns). Adaptive budget: 120K token target with graceful degradation. Vercel keeps a 150K hard guard.
 
 ## Data Flow (happy path)
 
 1. First open: onboarding card asks user role (builder/reviewer/inherited/exploring) → saved to `UserProperties`
-2. User types in sidebar → `send()` calls `google.script.run.getAnalyzePayload(prompt, null, skillHint)` to get serialized state + token (+ cross-ref graph if `/audit`)
-3. Sidebar calls `fetch(VERCEL_API_BASE + '/api/analyze', ...)` directly with streaming, including `crossRefGraph` if present
-4. `route.ts` verifies Google OAuth token, routes to skill, builds system prompt with role context, calls Claude via streaming API
-5. Claude streams JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` for X-Ray skill)
-6. Sidebar renders response progressively as chunks arrive via `ReadableStream`
-7. On stream complete: action-parser extracts and validates JSON block. Formula X-Ray responses short-circuit with passthrough (no action validation)
-8. Assistant response rendered as markdown + actions preview panel. Formula X-Ray renders a color-coded breakdown card instead
-9. User clicks "Apply All" → `google.script.run.applyActions(actions)` (X-Ray is read-only, no actions)
-10. `ActionExecutor.gs:executeActions()` applies each action to the spreadsheet
+2. User types in sidebar → `send()` calls `google.script.run.getStructuralPayload(prompt, skillHint)`
+3. `getStructuralPayload()` checks if the skill needs full context. If yes → falls back to `getAnalyzePayload()` (full serialization). If no → returns cached structural model (~2-5K tokens)
+4. Sidebar checks `payload.isStructuralPass`:
+   - **Structural path** → `streamStructuralAnalysis()`: streams from Vercel with structural model. If Claude returns `data_request`, calls `fetchRangeData()` for targeted data, then streams Pass 2
+   - **Full-context path** → `streamAnalysis()`: existing behavior with full workbook state
+5. `route.ts` verifies Google OAuth token, routes to skill, builds system prompt (includes two-pass protocol for structural requests), calls Claude via streaming API
+6. Claude streams JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` for X-Ray skill, or `type: "data_request"` for range requests)
+7. Sidebar renders response progressively as chunks arrive via `ReadableStream`
+8. On stream complete: action-parser extracts and validates JSON block. Formula X-Ray responses short-circuit with passthrough
+9. Assistant response rendered as markdown + actions preview panel. Formula X-Ray renders a color-coded breakdown card
+10. User clicks "Apply All" → `google.script.run.applyActions(actions)` (X-Ray is read-only, no actions)
+11. `ActionExecutor.gs:executeActions()` applies each action to the spreadsheet
 
 ## Project Structure
 
@@ -42,17 +56,17 @@ crunchy-sheets/
 │       └── auth/route.ts         # Google OAuth token verification endpoint
 │
 ├── lib/                          # Shared TypeScript modules
-│   ├── types.ts                  # CellAction, SkillDefinition, AnalyzeRequest/Response
-│   ├── skill-router.ts           # 14 skill definitions with keywords, instructions, model tiers
+│   ├── types.ts                  # CellAction, SkillDefinition, AnalyzeRequest/Response, DataRequest, ConversationEntry
+│   ├── skill-router.ts           # 14 skill definitions with keywords, instructions, model tiers, useFullContext flag
 │   ├── action-parser.ts          # Extracts JSON from Claude response, validates actions; formula_xray passthrough
 │   ├── system-prompt.ts          # Builds system prompt with temporal awareness + user role context
 │   ├── auth.ts                   # Google OAuth token verification, Supabase user upsert
 │   └── usage.ts                  # Token usage tracking to Supabase
 │
 ├── apps-script/                  # Google Apps Script add-on (deployed via clasp)
-│   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(prompt, activeSheetOverride, skillHint), applyActions(), openExpandedView() modeless dialog, user role persistence
-│   ├── Sidebar.html              # Chat UI, streaming fetch, markdown rendering, skill chips, action preview/apply, formula x-ray card, onboarding, window toggle, /xray /format /prove /audit slash commands
-│   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core) with adaptive token budget + buildCrossRefGraph() for tab audit
+│   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(), getStructuralPayload(), applyActions(), openExpandedView(), onWorkbookChange() trigger, user role persistence
+│   ├── Sidebar.html              # Chat UI, two-pass streaming (streamAnalysis + streamStructuralAnalysis), markdown rendering, skill chips, action preview/apply, formula x-ray card, phased loading states, compact chat history, onboarding, window toggle, /xray /format /prove /audit slash commands
+│   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core) with adaptive token budget, buildStructuralModel() + cache, fetchRangeData(), buildCrossRefGraph() for tab audit
 │   ├── ActionExecutor.gs         # Applies CellAction[] to the spreadsheet
 │   ├── OAuth.gs                  # getAuthToken(), checkAuthStatus(), registerUser()
 │   ├── Skills.gs                 # 14 financial skills registry (sidebar dropdown source)
@@ -239,15 +253,16 @@ RLS enabled on all tables, service role bypasses.
 
 ## Key Design Decisions
 
-- **Streaming via Vercel:** Sidebar calls Vercel directly via `fetch()` + `ReadableStream`. Response renders progressively — no waiting for full completion. Apps Script is bypassed for the AI call (only used for workbook serialization and action execution).
-- **Tiered serialization with adaptive budget:** Active sheet = full cell data. Other sheets = headers + 3+3 bookend rows, capped at 8 columns. Hidden sheets skipped. Target: ~25-40K tokens for an 8-tab SaaS model. If total exceeds 120K budget (e.g., after Prove It creates a large proof tab), the active sheet is degraded to truncated (headers + 30/10 rows) or summary. Vercel keeps a 150K hard guard as a safety net.
-- **No RAG:** Single JSON state per request. Simpler, more accurate than chunking.
+- **Two-pass architecture:** Most requests use a lightweight structural model (~2-5K tokens) with targeted reads (~50ms/sheet vs ~2s for full reads). Claude answers directly from structure or requests specific ranges. Full serialization only for 4 skills that need complete cell data (format, prove_it, tab_audit, xray). Structural model cached in `DocumentCache` (6h TTL), invalidated on structural changes (add/remove/rename sheet) via `onWorkbookChange()` trigger.
+- **Streaming via Vercel:** Sidebar calls Vercel directly via `fetch()` + `ReadableStream`. Response renders progressively. Apps Script is bypassed for the AI call (only used for workbook serialization and action execution).
+- **Full serialization with adaptive budget:** For full-context skills: active sheet = full cell data, other sheets = headers + 3+3 bookend rows (capped at 8 cols). 120K token budget with graceful degradation. Vercel keeps a 150K hard guard.
+- **Phased loading states:** Send button shows contextual phases (Reading... → Connecting... → Analyzing...) with elapsed timer after 5s. Skill-specific labels (Building proof..., Formatting..., etc.).
+- **Compact chat history:** `saveChatState()` stores `{role, text}` JSON objects (~50-100 bytes each) instead of raw `outerHTML` (~2-4KB each). Backward-compatible — old HTML format is discarded on first restore.
+- **Slash command display:** User sees their original input (`/xray B14`) in chat, not the mutated API prompt.
+- **No email display:** Auth is verified server-side on every `/api/analyze` request. Email display removed from sidebar.
+- **Conversation history:** Structural-pass requests include up to 6 recent conversation entries so Claude can reference prior exchanges and avoid re-requesting already-fetched data.
 - **Actions require confirmation:** Claude returns proposed actions → sidebar shows preview → user clicks "Apply All" before anything touches the spreadsheet.
-- **Skill routing is layered:** Explicit sidebar selection takes priority, then `[skill:xxx]` prefix, then keyword auto-detect, then default.
-- **Model selection per skill:** Opus for complex reasoning (cash flow, unit economics, cohorts, scenarios). Sonnet for fast analysis (variance, BvA, dashboard, categorization).
-- **Sheet type classification:** WorkbookState.gs auto-classifies tabs (assumptions, income_statement, balance_sheet, etc.) from name + header row patterns.
-- **Concise responses:** System prompt enforces sidebar-friendly brevity — short sentences, bullet points, no filler.
-- **Temporal awareness:** System prompt includes today's date. Claude says "most recent actuals (through [period])" instead of "current state ([period])". Notes stale data (>6 months old).
-- **Neutral language:** System prompt instructs "this model shows..." not "your forecast...". User role (if set) adjusts tone — builder gets technical directness, reviewer gets risk flags, inherited gets structural explanations.
-- **Onboarding:** First-use card asks user role (builder/reviewer/inherited/exploring). Saved to `UserProperties`, sent as `userRole` in every request. Role persists across sessions.
-- **Expanded view:** ↗ button opens a 700×750 modeless dialog via `showModelessDialog()` — stays container-bound, no scope escalation needed. `isDialogMode` flag (injected by `openExpandedView()`) swaps the button to ← for returning to sidebar. Chat state transfers bidirectionally via `UserProperties`. `saveChatState()` truncates to 8KB to stay within UserProperties limits.
+- **Skill routing is layered:** Explicit sidebar selection → `[skill:xxx]` prefix → keyword auto-detect → default. Skills with `useFullContext: true` bypass structural model.
+- **Model selection per skill:** Opus for complex reasoning (cash flow, unit economics, cohorts, scenarios, prove_it). Sonnet for fast analysis (variance, BvA, dashboard, categorization).
+- **Onboarding:** First-use card asks user role (builder/reviewer/inherited/exploring). Saved to `UserProperties`, sent as `userRole` in every request.
+- **Expanded view:** ↗ button opens a 700×750 modeless dialog via `showModelessDialog()`. Chat state transfers bidirectionally via `UserProperties` using compact JSON format.

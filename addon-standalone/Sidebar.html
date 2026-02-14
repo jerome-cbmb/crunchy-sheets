@@ -667,8 +667,6 @@
     </div>
   </div>
 
-  <div class="user-info" id="userInfo">Connecting...</div>
-
   <!-- Onboarding -->
   <div class="onboarding-card" id="onboardingCard" style="display:none;">
     <div class="onboarding-title">What's your relationship to this workbook?</div>
@@ -705,6 +703,7 @@
     var selectedSkill = null;
     var pendingActions = null; // Actions awaiting user confirmation
     var isDialogMode = (typeof isDialogMode !== 'undefined' && isDialogMode);
+    var conversationHistory = []; // [{role, content, fetchedRanges?}] for two-pass
 
     // ─── Init ───────────────────────────────────────────────────────────
     (function init() {
@@ -713,21 +712,6 @@
         var btn = document.querySelector('.expand-btn');
         if (btn) { btn.textContent = '←'; btn.title = 'Back to sidebar'; }
       }
-
-      // Load user info
-      google.script.run
-        .withSuccessHandler(function(status) {
-          var el = document.getElementById('userInfo');
-          if (status && status.authorized) {
-            el.textContent = status.email;
-          } else {
-            el.textContent = '⚠ Not authorized — please re-open the add-on.';
-          }
-        })
-        .withFailureHandler(function() {
-          document.getElementById('userInfo').textContent = '⚠ Could not check auth status.';
-        })
-        .checkAuthStatus();
 
       // Load skill chips
       google.script.run
@@ -772,6 +756,7 @@
       var input = document.getElementById('prompt');
       var text = input.value.trim();
       if (!text) return;
+      var displayText = text;
 
       // /prove slash command
       var proveSlashMatch = text.match(/^\/prove\s+(.*)/i);
@@ -820,9 +805,9 @@
         });
       }
 
-      addMessage(text, 'user');
+      addMessage(displayText, 'user');
       input.value = '';
-      setLoading(true);
+      setLoading(true, 'reading');
 
       // Prepend skill hint if selected (prove_it doesn't need prefix — it's sent in body)
       var fullPrompt = text;
@@ -848,16 +833,20 @@
         // Explicit chip with no context: let it through — Claude will respond with the same message server-side
       }
 
-      // Step 1: Get payload from Apps Script (workbook state + auth token)
+      // Step 1: Get payload from Apps Script (structural or full, based on skill)
       google.script.run
         .withSuccessHandler(function(payload) {
-          streamAnalysis(payload);
+          if (payload.isStructuralPass) {
+            streamStructuralAnalysis(payload, fullPrompt);
+          } else {
+            streamAnalysis(payload);
+          }
         })
         .withFailureHandler(function(err) {
           setLoading(false);
           addMessage('⚠ Error preparing request: ' + err.message, 'system');
         })
-        .getAnalyzePayload(fullPrompt, null, selectedSkill || null);
+        .getStructuralPayload(fullPrompt, selectedSkill || null);
     }
 
     // ─── Streaming ───────────────────────────────────────────────────────
@@ -909,7 +898,10 @@
         return;
       }
       var msgDiv = createStreamingMessage();
-      msgDiv.innerHTML = '<span class="stream-placeholder">Reading your spreadsheet...</span>';
+      setLoadingPhase('connecting');
+      msgDiv.innerHTML = '<span class="stream-placeholder">Connecting to AI...</span>';
+
+      var skillPhases = { prove_it: 'building_proof', workbook_format: 'formatting', tab_audit: 'auditing', formula_xray: 'xraying' };
 
       try {
         var response = await fetch(VERCEL_API_BASE + '/api/analyze', {
@@ -934,6 +926,9 @@
           throw new Error(response.status + ': ' + errText);
         }
 
+        setLoadingPhase(skillPhases[selectedSkill] || 'analyzing');
+        msgDiv.innerHTML = '';
+
         var reader = response.body.getReader();
         var decoder = new TextDecoder();
         var accumulated = '';
@@ -957,6 +952,188 @@
         if (msgDiv.parentNode) msgDiv.remove();
         addMessage('⚠ Error: ' + err.message, 'system');
       }
+    }
+
+    // ─── Two-Pass Structural Analysis ─────────────────────────────────────
+
+    /**
+     * Stream analysis using the structural model (lightweight first pass).
+     * If Claude returns a data_request, fetches targeted data and does Pass 2.
+     */
+    async function streamStructuralAnalysis(payload, originalPrompt) {
+      var msgDiv = createStreamingMessage();
+      setLoadingPhase('connecting');
+      msgDiv.innerHTML = '<span class="stream-placeholder">Connecting to AI...</span>';
+
+      var skillPhases = { prove_it: 'building_proof', workbook_format: 'formatting', tab_audit: 'auditing', formula_xray: 'xraying' };
+
+      try {
+        var response = await fetch(VERCEL_API_BASE + '/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + payload.token
+          },
+          body: JSON.stringify({
+            structuralModel: payload.structuralModel,
+            prompt: payload.prompt,
+            spreadsheetId: payload.spreadsheetId,
+            userEmail: payload.userEmail,
+            userRole: payload.userRole,
+            skill: selectedSkill || undefined,
+            isStructuralPass: true,
+            conversationHistory: conversationHistory.slice(-6)
+          })
+        });
+
+        if (!response.ok) {
+          var errText = await response.text();
+          throw new Error(response.status + ': ' + errText);
+        }
+
+        setLoadingPhase(skillPhases[selectedSkill] || 'analyzing');
+        msgDiv.innerHTML = '';
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var accumulated = '';
+
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          accumulated += decoder.decode(chunk.value, { stream: true });
+          // While streaming, check for data_request pattern and show user-friendly text
+          if (accumulated.indexOf('"data_request"') !== -1 && accumulated.indexOf('"ranges"') !== -1) {
+            msgDiv.innerHTML = '<span class="stream-placeholder">Looking up specific data...</span>';
+          } else {
+            updateStreamingMessage(msgDiv, accumulated);
+          }
+          scrollToBottom();
+        }
+
+        // Stream complete — check if it's a data request or a direct answer
+        var dataRequest = parseDataRequest(accumulated);
+
+        if (!dataRequest && accumulated.indexOf('"data_request"') !== -1) {
+          // Claude tried to request data but JSON was malformed — fall back to full serialization
+          removeStreamingIndicator(msgDiv);
+          msgDiv.remove();
+          setLoadingPhase('reading');
+          google.script.run
+            .withSuccessHandler(function(fullPayload) { streamAnalysis(fullPayload); })
+            .withFailureHandler(function(err) { setLoading(false); addMessage('⚠ Error: ' + err.message, 'system'); })
+            .getAnalyzePayload(originalPrompt, null, selectedSkill || null);
+          return;
+        }
+
+        if (!dataRequest) {
+          // Direct answer — finalize
+          setLoading(false);
+          removeStreamingIndicator(msgDiv);
+          finalizeStreamedMessage(msgDiv, accumulated);
+          // Append to conversation history
+          conversationHistory.push({ role: 'user', content: originalPrompt });
+          conversationHistory.push({ role: 'assistant', content: accumulated });
+          if (conversationHistory.length > 10) conversationHistory = conversationHistory.slice(-10);
+          return;
+        }
+
+        // Pass 2: fetch targeted data, then re-query
+        setLoadingPhase('fetching');
+        msgDiv.innerHTML = '<span class="stream-placeholder">Fetching requested data...</span>';
+
+        google.script.run
+          .withSuccessHandler(async function(fetchedData) {
+            try {
+              var response2 = await fetch(VERCEL_API_BASE + '/api/analyze', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + payload.token
+                },
+                body: JSON.stringify({
+                  structuralModel: payload.structuralModel,
+                  prompt: payload.prompt,
+                  spreadsheetId: payload.spreadsheetId,
+                  userEmail: payload.userEmail,
+                  userRole: payload.userRole,
+                  skill: selectedSkill || undefined,
+                  isStructuralPass: true,
+                  requestedData: fetchedData,
+                  conversationHistory: conversationHistory.slice(-6)
+                })
+              });
+
+              if (!response2.ok) {
+                var errText2 = await response2.text();
+                throw new Error(response2.status + ': ' + errText2);
+              }
+
+              setLoadingPhase(skillPhases[selectedSkill] || 'analyzing');
+              msgDiv.innerHTML = '';
+
+              var reader2 = response2.body.getReader();
+              var decoder2 = new TextDecoder();
+              var accumulated2 = '';
+
+              while (true) {
+                var chunk2 = await reader2.read();
+                if (chunk2.done) break;
+                accumulated2 += decoder2.decode(chunk2.value, { stream: true });
+                updateStreamingMessage(msgDiv, accumulated2);
+                scrollToBottom();
+              }
+
+              setLoading(false);
+              removeStreamingIndicator(msgDiv);
+              finalizeStreamedMessage(msgDiv, accumulated2);
+
+              // Track fetched ranges in conversation history
+              var fetchedRanges = dataRequest.ranges.map(function(r) { return r.sheet + '!' + r.range; });
+              conversationHistory.push({ role: 'user', content: originalPrompt, fetchedRanges: fetchedRanges });
+              conversationHistory.push({ role: 'assistant', content: accumulated2 });
+              if (conversationHistory.length > 10) conversationHistory = conversationHistory.slice(-10);
+
+            } catch (err2) {
+              setLoading(false);
+              removeStreamingIndicator(msgDiv);
+              if (msgDiv.parentNode) msgDiv.remove();
+              addMessage('⚠ Error: ' + err2.message, 'system');
+            }
+          })
+          .withFailureHandler(function(err) {
+            setLoading(false);
+            removeStreamingIndicator(msgDiv);
+            if (msgDiv.parentNode) msgDiv.remove();
+            addMessage('⚠ Error fetching data: ' + err.message, 'system');
+          })
+          .fetchRangeData(dataRequest.ranges);
+
+      } catch (err) {
+        setLoading(false);
+        removeStreamingIndicator(msgDiv);
+        if (msgDiv.parentNode) msgDiv.remove();
+        // Fall back to full serialization on any error
+        addMessage('⚠ Error: ' + err.message, 'system');
+      }
+    }
+
+    /**
+     * Parse a data_request JSON from Claude's streamed response.
+     * Returns parsed object or null if not a data request.
+     */
+    function parseDataRequest(text) {
+      var jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (!jsonMatch) return null;
+      try {
+        var parsed = JSON.parse(jsonMatch[1].trim());
+        if (parsed && parsed.type === 'data_request' && Array.isArray(parsed.ranges)) {
+          return parsed;
+        }
+      } catch (e) {
+        // Not valid JSON
+      }
+      return null;
     }
 
     /**
@@ -1582,10 +1759,38 @@
 
     // ─── Utility ────────────────────────────────────────────────────────
 
-    function setLoading(on) {
+    var loadingTimer = null;
+    var loadingStartTime = null;
+
+    function setLoading(on, phase) {
       var btn = document.getElementById('sendBtn');
       btn.disabled = on;
-      btn.innerHTML = on ? '<span class="spinner"></span>Thinking...' : 'Send';
+      if (!on) {
+        btn.innerHTML = 'Send';
+        if (loadingTimer) { clearInterval(loadingTimer); loadingTimer = null; }
+        loadingStartTime = null;
+        return;
+      }
+      loadingStartTime = Date.now();
+      setLoadingPhase(phase || 'reading');
+    }
+
+    function setLoadingPhase(phase) {
+      var btn = document.getElementById('sendBtn');
+      var labels = {
+        reading: 'Reading...', connecting: 'Connecting...', analyzing: 'Analyzing...',
+        building_proof: 'Building proof...', formatting: 'Formatting...',
+        auditing: 'Auditing tabs...', xraying: 'X-Raying...', fetching: 'Fetching data...'
+      };
+      var label = labels[phase] || 'Thinking...';
+      btn.innerHTML = '<span class="spinner"></span>' + label;
+      if (loadingTimer) clearInterval(loadingTimer);
+      loadingTimer = setInterval(function() {
+        var elapsed = Math.floor((Date.now() - loadingStartTime) / 1000);
+        if (elapsed >= 5) {
+          btn.innerHTML = '<span class="spinner"></span>' + label + ' (' + elapsed + 's)';
+        }
+      }, 1000);
     }
 
     function scrollToBottom() {
@@ -1738,30 +1943,44 @@
     }
 
     /**
-     * Serialize visible chat messages to UserProperties for state transfer.
-     * Truncation guard: UserProperties has a 9KB per-property limit.
-     * Drops oldest messages until under 8KB (leaves headroom).
+     * Serialize chat messages as compact {role, text, ts} objects.
+     * ~50-100 bytes each vs ~2-4KB per message in outerHTML.
      */
     function saveChatState(onDone) {
       var container = document.getElementById('messages');
       var children = container.children;
-      var state = [];
+      var messages = [];
       for (var i = 0; i < children.length; i++) {
-        state.push(children[i].outerHTML);
+        var el = children[i];
+        var role = 'system';
+        var text = '';
+        if (el.classList.contains('user')) {
+          role = 'user';
+          text = el.textContent || '';
+        } else if (el.classList.contains('assistant')) {
+          role = 'assistant';
+          text = el.dataset.rawText || el.textContent || '';
+        } else if (el.classList.contains('xray-card')) {
+          role = 'system';
+          text = '[X-Ray analysis was shown here]';
+        } else if (el.classList.contains('actions-panel') || el.classList.contains('results-panel')) {
+          role = 'system';
+          text = '[Actions panel]';
+        } else {
+          role = 'system';
+          text = el.textContent || '';
+        }
+        if (text) messages.push({ role: role, text: text });
       }
-      // Truncation guard: drop oldest messages until under 8KB
-      var json = JSON.stringify(state);
-      while (json.length > 8000 && state.length > 1) {
-        state.shift();
-        json = JSON.stringify(state);
-      }
+      var json = JSON.stringify(messages);
       var runner = google.script.run;
       if (onDone) runner = runner.withSuccessHandler(onDone);
       runner.saveChatHistory(json);
     }
 
     /**
-     * Restore chat messages from UserProperties (e.g., after expanding to dialog).
+     * Restore chat messages from compact JSON format.
+     * Handles backward-compat with old outerHTML format.
      */
     function restoreChatState() {
       google.script.run
@@ -1769,9 +1988,21 @@
           if (!stateJson) return;
           try {
             var state = JSON.parse(stateJson);
-            if (!state.length) return;
+            if (!Array.isArray(state) || !state.length) return;
+            // Detect old HTML format (array of strings starting with '<')
+            if (typeof state[0] === 'string') {
+              // Old format — discard gracefully (one-time migration)
+              google.script.run.saveChatHistory('');
+              return;
+            }
             var container = document.getElementById('messages');
-            container.innerHTML = state.join('');
+            container.innerHTML = '';
+            for (var i = 0; i < state.length; i++) {
+              var msg = state[i];
+              if (msg && msg.text) {
+                addMessage(msg.text, msg.role || 'system');
+              }
+            }
             scrollToBottom();
             google.script.run.saveChatHistory('');
           } catch(e) {

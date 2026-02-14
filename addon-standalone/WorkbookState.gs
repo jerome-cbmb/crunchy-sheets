@@ -499,3 +499,211 @@ function buildCrossRefGraph() {
 
   return { refs: refs, meta: meta };
 }
+
+// ─── Structural Model (Two-Pass Architecture) ─────────────────────────────
+
+/**
+ * Build a lightweight structural model of the workbook (~2-5K tokens).
+ * Uses targeted reads — NOT full-sheet getDataRange().
+ * Per sheet: name, type, dimensions, headers, sample values, key formulas.
+ * Top-level: named ranges, dependency graph from key formulas.
+ *
+ * @return {Object} Structural model.
+ */
+function buildStructuralModel() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var activeSheet = ss.getActiveSheet();
+  var sheets = ss.getSheets();
+
+  var crossRefRegex = /'((?:[^']|'')+)'!|([A-Za-z0-9_]+)!/g;
+  var sheetModels = [];
+  var dependencyGraph = {};
+
+  for (var i = 0; i < sheets.length; i++) {
+    var sheet = sheets[i];
+    if (sheet.isSheetHidden()) continue;
+
+    var name = sheet.getName();
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    var isActive = (name === activeSheet.getName());
+
+    var model = {
+      name: name,
+      index: sheet.getIndex(),
+      type: 'generic',
+      isActive: isActive,
+      dimensions: { rows: sheet.getMaxRows(), cols: sheet.getMaxColumns() },
+      dataRange: { rows: lastRow, cols: lastCol },
+      frozenRows: sheet.getFrozenRows(),
+      frozenCols: sheet.getFrozenColumns(),
+      headers: [],
+      sampleValues: [],
+      keyFormulas: []
+    };
+
+    if (lastRow === 0 || lastCol === 0) {
+      model.type = 'empty';
+      sheetModels.push(model);
+      dependencyGraph[name] = [];
+      continue;
+    }
+
+    // Targeted reads — only what we need
+    var headerRows = Math.min(2, lastRow);
+    var headerValues = sheet.getRange(1, 1, headerRows, lastCol).getValues();
+    model.headers = headerValues;
+
+    // Classify type from headers (reuse existing classifier — it only uses values[0])
+    model.type = _classifySheetType(name, headerValues);
+
+    // Sample values (rows 3-5, capped at 8 cols)
+    var sampleCols = Math.min(lastCol, 8);
+    if (lastRow > 2) {
+      var sampleRows = Math.min(3, lastRow - 2);
+      model.sampleValues = sheet.getRange(3, 1, sampleRows, sampleCols).getValues();
+    }
+
+    // Key formulas (first data row, capped at 8 cols)
+    if (lastRow > 2) {
+      var formulaCols = Math.min(lastCol, 8);
+      var formulaRow = sheet.getRange(3, 1, 1, formulaCols).getFormulas()[0];
+      var formulas = [];
+      for (var c = 0; c < formulaRow.length; c++) {
+        if (formulaRow[c]) {
+          formulas.push({ col: _colLetter(c + 1), formula: formulaRow[c] });
+        }
+      }
+      model.keyFormulas = formulas;
+
+      // Build dependency graph from key formulas
+      var deps = {};
+      for (var f = 0; f < formulas.length; f++) {
+        crossRefRegex.lastIndex = 0;
+        var match;
+        while ((match = crossRefRegex.exec(formulas[f].formula)) !== null) {
+          var refSheet = match[1] ? match[1].replace(/''/g, "'") : match[2];
+          if (refSheet !== name) deps[refSheet] = true;
+        }
+      }
+      dependencyGraph[name] = Object.keys(deps);
+    } else {
+      dependencyGraph[name] = [];
+    }
+
+    sheetModels.push(model);
+  }
+
+  return {
+    name: ss.getName(),
+    id: ss.getId(),
+    activeSheet: activeSheet.getName(),
+    namedRanges: _serializeNamedRanges(ss),
+    sheets: sheetModels,
+    dependencyGraph: dependencyGraph,
+    builtAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Get structural model from cache, or build and cache it.
+ * DocumentCache TTL: 6 hours (max allowed).
+ *
+ * @return {Object} Structural model.
+ */
+function getStructuralModelCached() {
+  var cache = CacheService.getDocumentCache();
+  var cached = cache.get('structural_model');
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      // Corrupted cache — rebuild
+    }
+  }
+  var model = buildStructuralModel();
+  var json = JSON.stringify(model);
+  // CacheService max value size is 100KB
+  if (json.length < 95000) {
+    cache.put('structural_model', json, 21600); // 6 hours
+  }
+  return model;
+}
+
+/**
+ * Invalidate the cached structural model.
+ * Called on structural workbook changes (add/remove/rename sheet).
+ */
+function invalidateStructuralCache() {
+  CacheService.getDocumentCache().remove('structural_model');
+}
+
+/**
+ * Fetch specific range data for Pass 2 of two-pass architecture.
+ * Takes array of {sheet, range} and returns cell data in the same
+ * format as _serializeSheet().
+ *
+ * @param {Array} requests - [{sheet: string, range: string}]
+ * @return {Object} Map of "Sheet!Range" → {cells: [...]}
+ */
+function fetchRangeData(requests) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var result = {};
+
+  for (var i = 0; i < requests.length; i++) {
+    var req = requests[i];
+    var sheet = ss.getSheetByName(req.sheet);
+    if (!sheet) {
+      result[req.sheet + '!' + req.range] = { error: 'Sheet not found: ' + req.sheet };
+      continue;
+    }
+
+    try {
+      var range = sheet.getRange(req.range);
+      var values = range.getValues();
+      var formulas = range.getFormulas();
+      var fontColors = range.getFontColors();
+      var startRow = range.getRow();
+      var startCol = range.getColumn();
+      var cells = [];
+
+      for (var r = 0; r < values.length; r++) {
+        for (var c = 0; c < values[r].length; c++) {
+          var val = values[r][c];
+          var formula = formulas[r][c];
+          if (val === '' && formula === '') continue;
+
+          var cell = {
+            row: startRow + r,
+            col: startCol + c,
+            ref: _colLetter(startCol + c) + (startRow + r)
+          };
+
+          if (formula) {
+            cell.formula = formula;
+            cell.value = _safeValue(val);
+          } else {
+            cell.value = _safeValue(val);
+          }
+
+          var color = fontColors[r][c];
+          if (color === '#0000ff' || color === '#0000FF') {
+            cell.role = 'input';
+          } else if (color === '#008000') {
+            cell.role = 'crossref';
+          } else if (formula) {
+            cell.role = 'formula';
+          }
+
+          cells.push(cell);
+        }
+      }
+
+      result[req.sheet + '!' + req.range] = { cells: cells };
+    } catch (e) {
+      result[req.sheet + '!' + req.range] = { error: e.message };
+    }
+  }
+
+  return result;
+}

@@ -87,6 +87,7 @@ const SKILL_DEFINITIONS: SkillDefinition[] = [
     id: 'workbook_format',
     modelTier: 'sonnet',
     maxTokens: 8192,
+    useFullContext: true,
     keywords: /^(?!.*(?:number|date|cell)\s*format).*\b(housekeep|tidy|clean\s*up|polish|beautif|organize\s*(?:the\s*)?(?:workbook|tabs|sheets)|format\s+(?:the\s+)?(?:entire|whole|all|workbook|every)|make\s+(?:it|this)\s+(?:look\s+)?(?:nice|clean|professional|pretty))\b/i,
     instruction: 'Format and organize this workbook. Apply professional financial formatting conventions and clean up the workbook structure.',
     systemAddendum: `
@@ -133,6 +134,7 @@ Return the standard JSON with actions[] array. In your response text, briefly su
     id: 'formula_xray',
     modelTier: 'sonnet',
     maxTokens: 4096,
+    useFullContext: true,
     keywords: /explain.*formula|formula.*explain|x-ray|xray|break.*down.*formula|#explain|explain.*cell|what.*does.*formula/i,
     instruction: 'Analyze the formula in the specified cell. If no cell is specified, pick the most complex formula on the active sheet. Return ONLY the formula_xray JSON — do NOT return the normal actions/response format.',
     systemAddendum: `
@@ -195,6 +197,7 @@ Do NOT include an "actions" array. Do NOT include a "response" field. Return ONL
     id: 'tab_audit',
     modelTier: 'sonnet',
     maxTokens: 8192,
+    useFullContext: true,
     keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs/i,
     instruction: 'Audit every tab in this workbook. Classify each as Connected, Isolated, Empty, or Scratch based on the cross-reference graph. Flag problematic tabs with color-coded actions.',
     systemAddendum: `
@@ -230,6 +233,7 @@ Return the standard JSON with actions[] array, response text, and summary.`,
     id: 'prove_it',
     modelTier: 'opus',
     maxTokens: 12288,
+    useFullContext: true,
     keywords: /prove\s+it|show\s+(me\s+)?your\s+work|back\s+it\s+up|prove\s+(that|this|the\s+numbers)/i,
     instruction: 'Build a proof tab that verifies your previous analysis. Create a sheet with formulas tracing every key number back to source cells. The proof must be auditable — every number from the workbook is a formula, never hardcoded.',
     systemAddendum: `
@@ -270,6 +274,7 @@ export function routeToSkill(prompt: string, explicitSkillId?: string): SkillCon
         instruction: skill.instruction,
         systemAddendum: skill.systemAddendum,
         maxTokens: skill.maxTokens,
+        useFullContext: skill.useFullContext,
       };
     }
   }
@@ -285,6 +290,7 @@ export function routeToSkill(prompt: string, explicitSkillId?: string): SkillCon
         instruction: skill.instruction,
         systemAddendum: skill.systemAddendum,
         maxTokens: skill.maxTokens,
+        useFullContext: skill.useFullContext,
       };
     }
   }
@@ -298,6 +304,7 @@ export function routeToSkill(prompt: string, explicitSkillId?: string): SkillCon
         instruction: skill.instruction,
         systemAddendum: skill.systemAddendum,
         maxTokens: skill.maxTokens,
+        useFullContext: skill.useFullContext,
       };
     }
   }

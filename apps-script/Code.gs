@@ -192,7 +192,8 @@ function getAnalyzePayload(userPrompt, activeSheetOverride, skillHint) {
     spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
     userEmail: Session.getActiveUser().getEmail(),
     userRole: userRole || undefined,
-    crossRefGraph: crossRefGraph
+    crossRefGraph: crossRefGraph,
+    isStructuralPass: false
   };
 }
 
@@ -316,3 +317,71 @@ function navigateToCell(sheetName, cellRef) {
   SpreadsheetApp.setActiveSheet(sheet);
   if (cellRef) sheet.setActiveSelection(cellRef);
 }
+
+// ─── Two-Pass Architecture ──────────────────────────────────────────────────
+
+/**
+ * Returns either a structural payload (lightweight, ~2-5K tokens) or a full
+ * payload (existing path) depending on the skill's needs.
+ *
+ * @param {string} userPrompt - The user's question or instruction.
+ * @param {string} skillHint - Optional skill ID hint.
+ * @return {Object} Payload for Vercel with isStructuralPass flag.
+ */
+function getStructuralPayload(userPrompt, skillHint) {
+  // Skills that need full workbook context
+  var fullContextSkills = { workbook_format: true, prove_it: true, tab_audit: true, formula_xray: true };
+  if (skillHint && fullContextSkills[skillHint]) {
+    return getAnalyzePayload(userPrompt, null, skillHint);
+  }
+
+  var model = getStructuralModelCached();
+  return {
+    structuralModel: model,
+    prompt: userPrompt,
+    token: ScriptApp.getOAuthToken(),
+    spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+    userEmail: Session.getActiveUser().getEmail(),
+    userRole: getUserRole() || undefined,
+    isStructuralPass: true
+  };
+}
+
+/**
+ * onChange trigger — invalidates structural cache on structural changes.
+ * Cell edits (EDIT) don't change structure, so they're ignored.
+ *
+ * @param {Object} e - Change event.
+ */
+function onWorkbookChange(e) {
+  var structuralChanges = { INSERT_GRID: true, REMOVE_GRID: true, RENAME: true, OTHER: true };
+  if (e && e.changeType && structuralChanges[e.changeType]) {
+    invalidateStructuralCache();
+  }
+}
+
+// Update onInstall to register onChange trigger
+var _originalOnInstall = onInstall;
+onInstall = function(e) {
+  _originalOnInstall(e);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var triggers = ScriptApp.getUserTriggers(ss);
+    var hasOnChange = false;
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === 'onWorkbookChange') {
+        hasOnChange = true;
+        break;
+      }
+    }
+    if (!hasOnChange) {
+      ScriptApp.newTrigger('onWorkbookChange')
+        .forSpreadsheet(ss)
+        .onChange()
+        .create();
+    }
+  } catch (err) {
+    // Trigger quota exceeded — structural model will be built fresh each time
+    Logger.log('Could not install onChange trigger: ' + err.message);
+  }
+};

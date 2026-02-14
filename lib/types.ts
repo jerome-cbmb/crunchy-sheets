@@ -1,7 +1,7 @@
 // ─── Cell Actions ──────────────────────────────────────────────────────────
 
 export interface CellAction {
-  type: 'set_value' | 'set_formula' | 'format_cell' | 'add_sheet' | 'rename_sheet' | 'add_named_range' | 'activate_sheet' | 'set_column_width' | 'freeze_rows' | 'format_range' | 'set_border' | 'auto_resize_columns' | 'delete_sheet' | 'set_tab_color' | 'add_note' | 'move_sheet';
+  type: 'set_value' | 'set_formula' | 'format_cell' | 'add_sheet' | 'rename_sheet' | 'add_named_range' | 'activate_sheet' | 'set_column_width' | 'freeze_rows' | 'freeze_cols' | 'format_range' | 'set_border' | 'auto_resize_columns' | 'delete_sheet' | 'set_tab_color' | 'add_note' | 'move_sheet';
   sheet?: string;
   cell?: string;
   value?: any;
@@ -25,6 +25,7 @@ export interface CellAction {
   column?: string;
   width?: number;
   rows?: number;
+  columns?: number;
   range?: string;
   color?: string;
   position?: number;

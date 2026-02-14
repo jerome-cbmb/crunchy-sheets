@@ -103,6 +103,9 @@ function _executeSingleAction(ss, action, index) {
     case 'freeze_rows':
       return _execFreezeRows(ss, action);
 
+    case 'freeze_cols':
+      return _execFreezeCols(ss, action);
+
     case 'format_range':
       return _execFormatRange(ss, action);
 
@@ -357,6 +360,16 @@ function _execFreezeRows(ss, action) {
 }
 
 /**
+ * freeze_cols — Freeze the first N columns on a sheet.
+ * Expected fields: { type, sheet, columns }
+ */
+function _execFreezeCols(ss, action) {
+  var sheet = _getSheet(ss, action.sheet);
+  sheet.setFrozenColumns(action.columns);
+  return { skipped: false };
+}
+
+/**
  * format_range — Apply formatting to a range of cells.
  * Expected fields: { type, sheet, range, format }
  * Supported format properties:
@@ -586,6 +599,9 @@ function _describeAction(action) {
 
     case 'freeze_rows':
       return 'Freeze top ' + action.rows + ' row' + (action.rows !== 1 ? 's' : '') + ' on ' + action.sheet;
+
+    case 'freeze_cols':
+      return 'Freeze first ' + action.columns + ' column' + (action.columns !== 1 ? 's' : '') + ' on ' + action.sheet;
 
     case 'format_range':
       var fmtParts2 = [];

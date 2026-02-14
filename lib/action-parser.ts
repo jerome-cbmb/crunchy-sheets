@@ -86,7 +86,7 @@ function validateAction(action: any): ValidationResult {
   }
 
   const type = action.type;
-  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet'].includes(type)) {
+  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'freeze_cols', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet'].includes(type)) {
     return { valid: false, error: `Invalid action type: ${type}` };
   }
 
@@ -146,6 +146,12 @@ function validateAction(action: any): ValidationResult {
     case 'freeze_rows':
       if (!action.sheet || !action.rows) {
         return { valid: false, error: 'freeze_rows requires sheet and rows' };
+      }
+      break;
+
+    case 'freeze_cols':
+      if (!action.sheet || !action.columns) {
+        return { valid: false, error: 'freeze_cols requires sheet and columns' };
       }
       break;
 
@@ -213,6 +219,7 @@ When you modify a workbook, return your response as a JSON object with this stru
     { "type": "activate_sheet", "sheet": "Dashboard" },
     { "type": "set_column_width", "sheet": "Dashboard", "column": "A", "width": 200 },
     { "type": "freeze_rows", "sheet": "Dashboard", "rows": 1 },
+    { "type": "freeze_cols", "sheet": "Dashboard", "columns": 1 },
     { "type": "format_range", "sheet": "P&L", "range": "B2:H50", "format": { "fontColor": "#000000", "verticalAlignment": "middle" } },
     { "type": "format_range", "sheet": "P&L", "range": "A1:H1", "format": { "bold": true, "background": "#e8f0fe", "wrapStrategy": "WRAP" } },
     { "type": "set_border", "sheet": "P&L", "range": "A1:H1", "bottom": true, "style": "SOLID", "color": "#000000" },

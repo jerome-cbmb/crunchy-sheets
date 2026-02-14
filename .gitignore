@@ -12,6 +12,9 @@ node_modules/
 # Cloud Functions build output
 cloud-functions/dist/
 
+# Generated/temp files
+addon-standalone/
+
 # OS
 .DS_Store
 .vercel

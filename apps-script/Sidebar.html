@@ -259,6 +259,10 @@
       border-top: 1px solid var(--border);
     }
 
+    .input-area {
+      position: relative;
+    }
+
     .input-area textarea {
       flex: 1;
       padding: 10px;
@@ -273,6 +277,36 @@
     .input-area textarea:focus {
       border-color: var(--accent);
     }
+
+    /* ─── Slash autocomplete ──────────────────────────────── */
+    .slash-menu {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 0; right: 0;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 4px;
+      z-index: 50;
+    }
+
+    .slash-menu.visible { display: block; }
+
+    .slash-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .slash-item:hover, .slash-item.active { background: var(--accent-light); }
+
+    .slash-cmd { font-weight: 600; color: var(--accent); font-family: 'Roboto Mono', monospace; font-size: 11px; }
+    .slash-desc { color: var(--text-secondary); font-size: 11px; }
 
     .input-area button {
       padding: 10px 16px;
@@ -292,34 +326,274 @@
       cursor: not-allowed;
     }
 
-    /* Skill selector */
-    .skill-bar {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding: 8px 0;
-      margin-bottom: 8px;
-    }
-
-    .skill-chip {
-      display: inline-block;
-      padding: 4px 10px;
+    /* ─── Command Palette ─────────────────────────────────── */
+    .palette-trigger {
+      width: 100%;
+      padding: 8px 12px;
       background: white;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      font-size: 11px;
+      font-size: 12px;
+      color: var(--text-secondary);
       cursor: pointer;
-      white-space: nowrap;
-      color: #5f6368;
+      text-align: left;
       transition: all 0.15s;
+      margin-bottom: 8px;
     }
 
-    .skill-chip:hover { border-color: var(--accent); color: var(--accent); }
-    .skill-chip.active {
-      background: var(--accent-light);
+    .palette-trigger:hover {
       border-color: var(--accent);
       color: var(--accent);
     }
+
+    .palette-trigger.has-skill {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .palette-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.2);
+      z-index: 100;
+    }
+
+    .palette-overlay.visible { display: block; }
+
+    .palette-dropdown {
+      position: absolute;
+      top: 0; left: 12px; right: 12px;
+      max-height: 70vh;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 101;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .palette-search {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .palette-search input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      outline: none;
+    }
+
+    .palette-search input:focus { border-color: var(--accent); }
+
+    .palette-list {
+      overflow-y: auto;
+      max-height: calc(70vh - 60px);
+      padding: 4px 0;
+    }
+
+    .palette-category {
+      padding: 6px 12px 2px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+    }
+
+    .palette-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-primary);
+      transition: background 0.1s;
+    }
+
+    .palette-item:hover { background: var(--accent-light); }
+    .palette-item.hidden { display: none; }
+
+    .palette-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+      width: 20px;
+      text-align: center;
+    }
+
+    .palette-item-info { flex: 1; min-width: 0; }
+
+    .palette-item-name {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .palette-item-desc {
+      font-size: 10px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .palette-model-tag {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .palette-model-tag.sonnet { background: #e8f0fe; color: #1a73e8; }
+    .palette-model-tag.opus { background: #f3e8fd; color: #7b1fa2; }
+
+    /* ─── Guided Form ─────────────────────────────────────── */
+    .guided-form {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .guided-form-title {
+      font-weight: 500;
+      font-size: 13px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .guided-form-back {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding: 0 4px;
+    }
+
+    .guided-form-back:hover { color: var(--accent); }
+
+    .guided-field {
+      margin-bottom: 10px;
+    }
+
+    .guided-field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .guided-field input[type="text"],
+    .guided-field select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      outline: none;
+    }
+
+    .guided-field input:focus,
+    .guided-field select:focus { border-color: var(--accent); }
+
+    .guided-field-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .guided-field-row label {
+      margin-bottom: 0;
+      flex: 1;
+    }
+
+    .guided-toggle {
+      position: relative;
+      width: 32px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .guided-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .guided-toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc;
+      border-radius: 9px;
+      transition: 0.2s;
+    }
+
+    .guided-toggle-slider:before {
+      content: "";
+      position: absolute;
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+
+    .guided-toggle input:checked + .guided-toggle-slider {
+      background: var(--accent);
+    }
+
+    .guided-toggle input:checked + .guided-toggle-slider:before {
+      transform: translateX(14px);
+    }
+
+    .guided-checkboxes {
+      max-height: 100px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 0;
+    }
+
+    .guided-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .guided-checkbox:hover { background: var(--bg-warm); }
+    .guided-checkbox input { margin: 0; }
+
+    .guided-run-btn {
+      width: 100%;
+      padding: 8px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+
+    .guided-run-btn:hover { background: #0a3d25; }
 
     .loading { opacity: 0.6; pointer-events: none; }
 
@@ -338,7 +612,7 @@
       border-top-color: #1e8e3e;
     }
 
-    /* ─── Header flex row + expand button ────────────────── */
+    /* ─── Header flex row ────────────────────────────────── */
     .header-row {
       display: flex;
       align-items: center;
@@ -356,7 +630,13 @@
       flex-shrink: 0;
     }
 
-    .expand-btn {
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .header-btn {
       background: none;
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -368,7 +648,7 @@
       line-height: 1;
     }
 
-    .expand-btn:hover {
+    .header-btn:hover {
       border-color: var(--accent);
       color: var(--accent);
     }
@@ -402,48 +682,68 @@
     }
     .cell-ref:hover { text-decoration: underline; }
 
-    /* ─── Onboarding card ────────────────────────────────── */
-    .onboarding-card {
+    /* ─── Example Prompts ──────────────────────────────────── */
+    .example-prompts {
+      padding: 8px 0;
+    }
+
+    .example-prompts-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .example-prompt {
+      display: block;
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 6px;
       background: white;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-
-    .onboarding-title {
-      font-weight: 500;
-      font-size: 13px;
-      margin-bottom: 12px;
-    }
-
-    .role-option {
-      display: block;
-      padding: 8px 10px;
-      margin-bottom: 4px;
-      border-radius: var(--radius);
-      cursor: pointer;
       font-size: 12px;
+      color: var(--text-primary);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
       line-height: 1.4;
     }
 
-    .role-option:hover { background: var(--bg-warm); }
-    .role-option input { margin-right: 8px; }
-
-    .onboarding-btn {
-      margin-top: 12px;
-      width: 100%;
-      padding: 10px;
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: var(--radius);
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
+    .example-prompt:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      color: var(--accent);
     }
 
-    .onboarding-btn:hover { background: #0a3d25; }
+    /* ─── Settings panel ──────────────────────────────────── */
+    .settings-panel {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    .settings-panel.visible { display: block; }
+
+    .settings-title {
+      font-weight: 500;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .settings-option {
+      display: block;
+      padding: 6px 8px;
+      margin-bottom: 2px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    .settings-option:hover { background: var(--bg-warm); }
+    .settings-option input { margin-right: 6px; }
 
     /* ─── Formula X-Ray Card ──────────────────────────────── */
     .xray-card {
@@ -604,6 +904,36 @@
       color: #3c4043;
     }
 
+    /* ─── Typing indicator ────────────────────────────────── */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      border-bottom-left-radius: 4px;
+      max-width: 60px;
+    }
+
+    .typing-indicator .dot {
+      width: 6px;
+      height: 6px;
+      background: #9aa0a6;
+      border-radius: 50%;
+      animation: typingBounce 1.2s infinite ease-in-out;
+    }
+
+    .typing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
+
     /* ─── Streaming indicator ──────────────────────────────── */
     .message.assistant.streaming::after {
       content: '▊';
@@ -642,11 +972,6 @@
     /* ─── Skip reasons in results ─────────────────────────── */
     .skip-reason { padding: 4px 14px; font-size: 11px; color: #b06000; }
 
-    /* ─── Prove It chip accent ────────────────────────────── */
-    .skill-chip-prove { border-color: #1e8e3e; color: #1e8e3e; }
-    .skill-chip-prove:hover { border-color: #137333; color: #137333; }
-    .skill-chip-prove.active { background: #e6f4ea; border-color: #1e8e3e; color: #1e8e3e; }
-
     /* ─── Proof link ──────────────────────────────────────── */
     .proof-link {
       padding: 8px 14px; color: #1e8e3e; font-size: 12px;
@@ -663,22 +988,32 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
         <h1>Crunchy Sheets</h1>
       </div>
-      <button class="expand-btn" onclick="toggleView()" title="Open in window">↗</button>
+      <div class="header-actions">
+        <button class="header-btn" onclick="startNewChat()" title="New chat">+</button>
+        <button class="header-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+      </div>
     </div>
   </div>
 
-  <!-- Onboarding -->
-  <div class="onboarding-card" id="onboardingCard" style="display:none;">
-    <div class="onboarding-title">What's your relationship to this workbook?</div>
-    <label class="role-option"><input type="radio" name="userRole" value="builder"> <strong>Builder</strong> — I created or maintain this model</label>
-    <label class="role-option"><input type="radio" name="userRole" value="reviewer"> <strong>Reviewer</strong> — I'm reviewing or auditing this</label>
-    <label class="role-option"><input type="radio" name="userRole" value="inherited"> <strong>Inherited</strong> — I took over someone else's model</label>
-    <label class="role-option"><input type="radio" name="userRole" value="exploring"> <strong>Exploring</strong> — Just looking around</label>
-    <button class="onboarding-btn" onclick="completeOnboarding()">Start</button>
+  <!-- Settings panel (role selection) -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-title">Your role with this workbook:</div>
+    <label class="settings-option"><input type="radio" name="userRole" value="builder" onchange="saveRoleSetting(this.value)"> <strong>Builder</strong> — I created or maintain this</label>
+    <label class="settings-option"><input type="radio" name="userRole" value="reviewer" onchange="saveRoleSetting(this.value)"> <strong>Reviewer</strong> — I'm reviewing or auditing</label>
+    <label class="settings-option"><input type="radio" name="userRole" value="inherited" onchange="saveRoleSetting(this.value)"> <strong>Inherited</strong> — I took over someone else's model</label>
+    <label class="settings-option"><input type="radio" name="userRole" value="exploring" onchange="saveRoleSetting(this.value)"> <strong>Exploring</strong> — Just looking around</label>
   </div>
 
-  <!-- Skill chips -->
-  <div class="skill-bar" id="skillBar"></div>
+  <!-- Command Palette -->
+  <button class="palette-trigger" id="paletteTrigger" onclick="openPalette()">What do you want to do?</button>
+  <div class="palette-overlay" id="paletteOverlay" onclick="closePalette()">
+    <div class="palette-dropdown" id="paletteDropdown" onclick="event.stopPropagation()">
+      <div class="palette-search">
+        <input type="text" id="paletteSearch" placeholder="Search skills..." oninput="filterPalette(this.value)">
+      </div>
+      <div class="palette-list" id="paletteList"></div>
+    </div>
+  </div>
 
   <!-- Chat -->
   <div class="chat-container">
@@ -689,7 +1024,8 @@
     </div>
 
     <div class="input-area">
-      <textarea id="prompt" rows="2" placeholder="Ask about this workbook..." onkeydown="handleKey(event)"></textarea>
+      <div class="slash-menu" id="slashMenu"></div>
+      <textarea id="prompt" rows="2" placeholder="Ask about this workbook..." onkeydown="handleKey(event)" oninput="handleSlashAutocomplete(this.value)"></textarea>
       <button id="sendBtn" onclick="send()">Send</button>
     </div>
   </div>
@@ -702,40 +1038,23 @@
     // ─── State ──────────────────────────────────────────────────────────
     var selectedSkill = null;
     var pendingActions = null; // Actions awaiting user confirmation
-    var isDialogMode = (typeof isDialogMode !== 'undefined' && isDialogMode);
     var conversationHistory = []; // [{role, content, fetchedRanges?}] for two-pass
+    var cacheMeta = null; // { sheetNames: [], sheetCount: N, activeSheet: '' }
 
     // ─── Init ───────────────────────────────────────────────────────────
     (function init() {
-      // Dialog mode: change expand button to back arrow
-      if (isDialogMode) {
-        var btn = document.querySelector('.expand-btn');
-        if (btn) { btn.textContent = '←'; btn.title = 'Back to sidebar'; }
-      }
-
-      // Load skill chips
+      // Warm structural cache in background + get sheet metadata
       google.script.run
-        .withSuccessHandler(function(skills) {
-          var bar = document.getElementById('skillBar');
-          skills.forEach(function(skill) {
-            var chip = document.createElement('div');
-            chip.className = 'skill-chip';
-            if (skill.id === 'prove_it') chip.classList.add('skill-chip-prove');
-            chip.textContent = skill.name;
-            chip.dataset.id = skill.id;
-            chip.onclick = function() {
-              document.querySelectorAll('.skill-chip').forEach(function(c) { c.classList.remove('active'); });
-              if (selectedSkill === skill.id) {
-                selectedSkill = null;
-              } else {
-                chip.classList.add('active');
-                selectedSkill = skill.id;
-              }
-            };
-            bar.appendChild(chip);
-          });
+        .withSuccessHandler(function(meta) {
+          cacheMeta = meta;
         })
-        .getSkillRegistry();
+        .withFailureHandler(function(err) {
+          console.warn('[Cache] Warm failed:', err.message);
+        })
+        .warmStructuralCache();
+
+      // Build Command Palette
+      buildPalette();
 
       // Check if onboarding is needed
       checkOnboarding();
@@ -746,10 +1065,68 @@
 
     // ─── Chat ───────────────────────────────────────────────────────────
     function handleKey(e) {
+      // Tab to complete slash command
+      if (e.key === 'Tab' && slashActiveIndex >= 0) {
+        e.preventDefault();
+        var items = document.querySelectorAll('#slashMenu .slash-item');
+        if (items[slashActiveIndex]) {
+          items[slashActiveIndex].click();
+        }
+        return;
+      }
+      // Escape to close slash menu
+      if (e.key === 'Escape') {
+        document.getElementById('slashMenu').classList.remove('visible');
+        slashActiveIndex = -1;
+        return;
+      }
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         send();
       }
+    }
+
+    // ─── Slash Command Autocomplete ─────────────────────────────────────────
+
+    var SLASH_COMMANDS = [
+      { cmd: '/xray', desc: 'Explain a formula', skill: 'formula_xray' },
+      { cmd: '/format', desc: 'Format & organize workbook', skill: 'workbook_format' },
+      { cmd: '/prove', desc: 'Build proof tab', skill: 'prove_it' },
+      { cmd: '/audit', desc: 'Audit tabs for unused sheets', skill: 'tab_audit' }
+    ];
+    var slashActiveIndex = -1;
+
+    function handleSlashAutocomplete(value) {
+      var menu = document.getElementById('slashMenu');
+      if (!value.startsWith('/') || value.indexOf(' ') !== -1) {
+        menu.classList.remove('visible');
+        slashActiveIndex = -1;
+        return;
+      }
+      var q = value.toLowerCase();
+      var matches = SLASH_COMMANDS.filter(function(c) { return c.cmd.indexOf(q) === 0; });
+      if (matches.length === 0) {
+        menu.classList.remove('visible');
+        slashActiveIndex = -1;
+        return;
+      }
+      menu.innerHTML = '';
+      matches.forEach(function(c, i) {
+        var item = document.createElement('div');
+        item.className = 'slash-item' + (i === 0 ? ' active' : '');
+        item.innerHTML = '<span class="slash-cmd">' + c.cmd + '</span> <span class="slash-desc">' + c.desc + '</span>';
+        item.onclick = function() { completeSlashCommand(c.cmd); };
+        menu.appendChild(item);
+      });
+      slashActiveIndex = 0;
+      menu.classList.add('visible');
+    }
+
+    function completeSlashCommand(cmd) {
+      document.getElementById('prompt').value = cmd + ' ';
+      document.getElementById('slashMenu').classList.remove('visible');
+      slashActiveIndex = -1;
+      document.getElementById('prompt').focus();
     }
 
     function send() {
@@ -806,6 +1183,7 @@
       }
 
       addMessage(displayText, 'user');
+      showTypingIndicator();
       input.value = '';
       setLoading(true, 'reading');
 
@@ -844,6 +1222,7 @@
         })
         .withFailureHandler(function(err) {
           setLoading(false);
+          removeTypingIndicator();
           addMessage('⚠ Error preparing request: ' + err.message, 'system');
         })
         .getStructuralPayload(fullPrompt, selectedSkill || null);
@@ -852,9 +1231,32 @@
     // ─── Streaming ───────────────────────────────────────────────────────
 
     /**
+     * Show a typing indicator (three bouncing dots) in the chat area.
+     */
+    function showTypingIndicator() {
+      removeTypingIndicator();
+      var container = document.getElementById('messages');
+      var div = document.createElement('div');
+      div.className = 'typing-indicator';
+      div.id = 'typingIndicator';
+      div.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+      container.appendChild(div);
+      scrollToBottom();
+    }
+
+    /**
+     * Remove the typing indicator if present.
+     */
+    function removeTypingIndicator() {
+      var el = document.getElementById('typingIndicator');
+      if (el) el.remove();
+    }
+
+    /**
      * Create a message div for progressive streaming rendering.
      */
     function createStreamingMessage() {
+      removeTypingIndicator();
       var container = document.getElementById('messages');
       var div = document.createElement('div');
       div.className = 'message assistant streaming';
@@ -868,12 +1270,17 @@
      * Update a streaming message div with accumulated text (progressive markdown).
      */
     function updateStreamingMessage(div, text) {
-      // Strip completed JSON code blocks from display during streaming
-      var displayText = text.replace(/```json[\s\S]*?```/g, '').trim();
-      // Detect open JSON fence with no closing fence → show building indicator
-      var hasOpenJson = /```json/.test(text) && !(/```json[\s\S]*?```/).test(text);
+      // Strip completed JSON code blocks first, then check for open ones
+      var stripped = text.replace(/```json[\s\S]*?```/g, '');
+      var displayText = stripped.trim();
+      var hasOpenJson = /```json/.test(stripped);
+
       if (hasOpenJson) {
-        var indicator = '<div class="json-building"><span class="spinner small"></span> Building changes...</div>';
+        // Remove everything from the open fence onward
+        displayText = stripped.substring(0, stripped.indexOf('```json')).trim();
+        var isXray = text.indexOf('"formula_xray"') !== -1;
+        var label = isXray ? 'Analyzing formula...' : 'Building changes...';
+        var indicator = '<div class="json-building"><span class="spinner small"></span> ' + label + '</div>';
         div.innerHTML = (displayText ? renderMarkdown(escapeHtml(displayText)) : '') + indicator;
       } else if (displayText) {
         div.innerHTML = renderMarkdown(escapeHtml(displayText));
@@ -950,7 +1357,7 @@
         setLoading(false);
         removeStreamingIndicator(msgDiv);
         if (msgDiv.parentNode) msgDiv.remove();
-        addMessage('⚠ Error: ' + err.message, 'system');
+        addMessage('⚠ ' + formatErrorMessage(err.message), 'system');
       }
     }
 
@@ -1040,7 +1447,8 @@
 
         // Pass 2: fetch targeted data, then re-query
         setLoadingPhase('fetching');
-        msgDiv.innerHTML = '<span class="stream-placeholder">Fetching requested data...</span>';
+        var rangeDesc = dataRequest.ranges.map(function(r) { return r.sheet + '!' + r.range; }).join(', ');
+        msgDiv.innerHTML = '<span class="stream-placeholder">Fetching ' + escapeHtml(rangeDesc) + '...</span>';
 
         google.script.run
           .withSuccessHandler(async function(fetchedData) {
@@ -1113,8 +1521,7 @@
         setLoading(false);
         removeStreamingIndicator(msgDiv);
         if (msgDiv.parentNode) msgDiv.remove();
-        // Fall back to full serialization on any error
-        addMessage('⚠ Error: ' + err.message, 'system');
+        addMessage('⚠ ' + formatErrorMessage(err.message), 'system');
       }
     }
 
@@ -1184,6 +1591,12 @@
         var trimmed = claudeText.trim();
         if (trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}') {
           jsonText = trimmed;
+        } else {
+          // Fallback: try to extract a JSON object containing actions or formula_xray
+          var fallbackMatch = claudeText.match(/\{[\s\S]*"(?:type|actions|formula_xray)"[\s\S]*\}/);
+          if (fallbackMatch) {
+            jsonText = fallbackMatch[0];
+          }
         }
       }
 
@@ -1249,7 +1662,7 @@
       }
 
       var type = action.type;
-      var validTypes = ['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet'];
+      var validTypes = ['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'freeze_cols', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet'];
       if (!type || validTypes.indexOf(type) === -1) {
         return { valid: false, error: 'Invalid action type: ' + type };
       }
@@ -1419,6 +1832,7 @@
     // ─── Message Rendering ──────────────────────────────────────────────
 
     function addMessage(text, role) {
+      if (role === 'user') removeExamplePrompts();
       var container = document.getElementById('messages');
       var div = document.createElement('div');
       div.className = 'message ' + role;
@@ -1481,12 +1895,16 @@
       });
       list.style.maxHeight = isProofAction ? '300px' : '180px';
 
-      actions.forEach(function(action) {
+      actions.forEach(function(action, idx) {
         var item = document.createElement('div');
         item.className = 'action-item';
-        item.innerHTML = '<span class="action-type-tag tag-' + (action.type || 'default') + '">'
+        item.style.display = 'flex';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '6px';
+        item.innerHTML = '<input type="checkbox" checked data-action-idx="' + idx + '" onchange="updateApplyCount()" style="margin-top:2px;flex-shrink:0;">'
+          + '<span><span class="action-type-tag tag-' + (action.type || 'default') + '">'
           + escapeHtml(formatActionType(action.type)) + '</span> '
-          + escapeHtml(describeActionLocally(action));
+          + escapeHtml(describeActionLocally(action)) + '</span>';
         list.appendChild(item);
       });
 
@@ -1499,7 +1917,7 @@
       var applyBtn = document.createElement('button');
       applyBtn.className = 'btn-apply';
       applyBtn.id = 'applyBtn';
-      applyBtn.textContent = 'Apply All';
+      applyBtn.textContent = 'Apply All (' + actions.length + ')';
       applyBtn.onclick = function() { applyAllActions(); };
 
       var cancelBtn = document.createElement('button');
@@ -1518,31 +1936,70 @@
     // ─── Action Execution ───────────────────────────────────────────────
 
     /**
-     * Apply all pending actions via google.script.run.applyActions().
+     * Update the Apply button text to reflect checked action count.
+     */
+    function updateApplyCount() {
+      var panel = document.getElementById('actionsPanelActive');
+      if (!panel || !pendingActions) return;
+      var checked = panel.querySelectorAll('input[data-action-idx]:checked');
+      var btn = document.getElementById('applyBtn');
+      if (btn) {
+        var n = checked.length;
+        btn.textContent = n === pendingActions.length ? 'Apply All (' + n + ')' : 'Apply Selected (' + n + ')';
+        btn.disabled = n === 0;
+      }
+    }
+
+    /**
+     * Apply pending actions (filtered by checkboxes) via google.script.run.applyActions().
      */
     function applyAllActions() {
       if (!pendingActions || pendingActions.length === 0) return;
 
+      // Filter by checked checkboxes
+      var panel = document.getElementById('actionsPanelActive');
+      var checked = panel ? panel.querySelectorAll('input[data-action-idx]:checked') : [];
+      var selectedIndices = {};
+      for (var i = 0; i < checked.length; i++) {
+        selectedIndices[checked[i].dataset.actionIdx] = true;
+      }
+      var filtered = pendingActions.filter(function(a, idx) {
+        return checked.length === 0 || selectedIndices[idx];
+      });
+      if (filtered.length === 0) return;
+
       var applyBtn = document.getElementById('applyBtn');
+      var total = filtered.length;
       if (applyBtn) {
         applyBtn.disabled = true;
-        applyBtn.innerHTML = '<span class="spinner green"></span>Applying...';
+        applyBtn.innerHTML = '<span class="spinner green"></span>Applying 0 of ' + total + '...';
       }
 
-      var actionsToApply = pendingActions;
-      var lastAppliedActions = pendingActions;
+      // Animated count-up
+      var count = 0;
+      var applyTimer = setInterval(function() {
+        count++;
+        if (count >= total) count = total;
+        if (applyBtn) {
+          applyBtn.innerHTML = '<span class="spinner green"></span>Applying ' + count + ' of ' + total + '...';
+        }
+        if (count >= total) clearInterval(applyTimer);
+      }, Math.max(50, Math.min(200, 3000 / total)));
+
+      var actionsToApply = filtered;
+      var lastAppliedActions = filtered;
       pendingActions = null;
 
       google.script.run
         .withSuccessHandler(function(result) {
-          // Remove the active panel
+          clearInterval(applyTimer);
           var panel = document.getElementById('actionsPanelActive');
           if (panel) panel.remove();
 
-          // Show results (pass applied actions for proof link)
           addResultsPanel(result, lastAppliedActions);
         })
         .withFailureHandler(function(err) {
+          clearInterval(applyTimer);
           var panel = document.getElementById('actionsPanelActive');
           if (panel) panel.remove();
 
@@ -1630,8 +2087,58 @@
         }
       }
 
+      // Post-apply next step suggestions
+      var suggestions = getNextStepSuggestions(appliedActions);
+      if (suggestions.length > 0) {
+        var sugDiv = document.createElement('div');
+        sugDiv.style.cssText = 'padding: 8px 14px; border-top: 1px solid #f1f3f4;';
+        sugDiv.innerHTML = '<div style="font-size:10px;color:#999;margin-bottom:4px;">Next steps:</div>';
+        suggestions.forEach(function(sug) {
+          var btn = document.createElement('button');
+          btn.className = 'example-prompt';
+          btn.style.cssText = 'margin-bottom:4px;padding:6px 10px;font-size:11px;';
+          btn.textContent = sug.text;
+          btn.onclick = function() {
+            if (sug.skill) selectedSkill = sug.skill;
+            document.getElementById('prompt').value = sug.text;
+            send();
+          };
+          sugDiv.appendChild(btn);
+        });
+        panel.appendChild(sugDiv);
+      }
+
       container.appendChild(panel);
       scrollToBottom();
+    }
+
+    /**
+     * Get contextual next-step suggestions based on what actions were applied.
+     */
+    function getNextStepSuggestions(actions) {
+      if (!actions || actions.length === 0) return [];
+      var hasFormat = actions.some(function(a) { return a.type === 'format_range' || a.type === 'format_cell' || a.type === 'set_border'; });
+      var hasData = actions.some(function(a) { return a.type === 'set_value' || a.type === 'set_formula'; });
+      var hasTabChanges = actions.some(function(a) { return a.type === 'delete_sheet' || a.type === 'set_tab_color' || a.type === 'move_sheet'; });
+
+      if (hasFormat) {
+        return [
+          { text: 'Audit tabs for unused sheets', skill: 'tab_audit' },
+          { text: 'Any more cleanup needed?', skill: 'workbook_format' }
+        ];
+      }
+      if (hasData) {
+        return [
+          { text: 'Prove it — show your work', skill: 'prove_it' },
+          { text: 'Review the changes', skill: null }
+        ];
+      }
+      if (hasTabChanges) {
+        return [
+          { text: 'Format the remaining tabs', skill: 'workbook_format' }
+        ];
+      }
+      return [];
     }
 
     // ─── Formula X-Ray Renderer ────────────────────────────────────────
@@ -1909,37 +2416,35 @@
     }
 
     /**
+     * Format error messages with contextual recovery tips.
+     */
+    function formatErrorMessage(msg) {
+      if (!msg) return 'Unknown error. Try again.';
+      if (msg.indexOf('413') !== -1 || msg.indexOf('too large') !== -1 || msg.indexOf('payload') !== -1) {
+        return 'Workbook too large for this request. Try /xray on a specific cell, or work with a smaller tab.';
+      }
+      if (msg.indexOf('401') !== -1 || msg.indexOf('Unauthorized') !== -1 || msg.indexOf('auth') !== -1) {
+        return 'Session expired. Close and reopen the sidebar to reconnect.';
+      }
+      if (msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('timeout') !== -1) {
+        return 'Connection failed. Check your internet and try again.';
+      }
+      if (msg.indexOf('429') !== -1 || msg.indexOf('rate') !== -1) {
+        return 'Rate limit reached. Wait a moment and try again.';
+      }
+      if (msg.indexOf('500') !== -1 || msg.indexOf('502') !== -1 || msg.indexOf('503') !== -1) {
+        return 'Server error. Try again in a few seconds. If it persists, the service may be temporarily down.';
+      }
+      return 'Error: ' + msg;
+    }
+
+    /**
      * Escape HTML entities to prevent XSS in rendered content.
      */
     function escapeHtml(str) {
       var div = document.createElement('div');
       div.appendChild(document.createTextNode(str));
       return div.innerHTML;
-    }
-
-    // ─── Window Toggle ────────────────────────────────────────────────────
-
-    /**
-     * Toggle between sidebar and standalone browser window.
-     * Expand: opens a real Chrome window via the deployed web app URL.
-     * Collapse: saves chat state and closes the window.
-     */
-    function toggleView() {
-      if (isDialogMode) {
-        // Dialog → sidebar: save state, open sidebar, close dialog
-        saveChatState(function() {
-          google.script.run
-            .withSuccessHandler(function() { google.script.host.close(); })
-            .showSidebar();
-        });
-      } else {
-        // Sidebar → dialog: save state, open dialog, close sidebar
-        saveChatState(function() {
-          google.script.run
-            .withSuccessHandler(function() { google.script.host.close(); })
-            .openExpandedView();
-        });
-      }
     }
 
     /**
@@ -1972,7 +2477,11 @@
         }
         if (text) messages.push({ role: role, text: text });
       }
-      var json = JSON.stringify(messages);
+      var stateObj = {
+        messages: messages,
+        history: conversationHistory.slice(-6)
+      };
+      var json = JSON.stringify(stateObj);
       var runner = google.script.run;
       if (onDone) runner = runner.withSuccessHandler(onDone);
       runner.saveChatHistory(json);
@@ -1988,20 +2497,25 @@
           if (!stateJson) return;
           try {
             var state = JSON.parse(stateJson);
-            if (!Array.isArray(state) || !state.length) return;
+            // New format: { messages: [...], history: [...] }
+            var messages = Array.isArray(state) ? state : (state.messages || []);
+            if (!messages.length) return;
             // Detect old HTML format (array of strings starting with '<')
-            if (typeof state[0] === 'string') {
-              // Old format — discard gracefully (one-time migration)
+            if (typeof messages[0] === 'string') {
               google.script.run.saveChatHistory('');
               return;
             }
             var container = document.getElementById('messages');
             container.innerHTML = '';
-            for (var i = 0; i < state.length; i++) {
-              var msg = state[i];
+            for (var i = 0; i < messages.length; i++) {
+              var msg = messages[i];
               if (msg && msg.text) {
                 addMessage(msg.text, msg.role || 'system');
               }
+            }
+            // Restore conversation history
+            if (state.history && Array.isArray(state.history)) {
+              conversationHistory = state.history;
             }
             scrollToBottom();
             google.script.run.saveChatHistory('');
@@ -2012,37 +2526,435 @@
         .loadChatHistory();
     }
 
-    // ─── Onboarding ───────────────────────────────────────────────────────
+    // ─── Command Palette ──────────────────────────────────────────────────
+
+    var PALETTE_CATEGORIES = [
+      { key: 'analysis', icon: '📊', label: 'Analysis' },
+      { key: 'modeling', icon: '📐', label: 'Modeling' },
+      { key: 'automation', icon: '⚡', label: 'Automation' },
+      { key: 'reporting', icon: '📋', label: 'Reporting' }
+    ];
+
+    var PALETTE_SKILLS = {
+      // ── Guided forms (4 skills) ──
+      formula_xray: {
+        placeholder: 'Which cell to analyze?',
+        fields: [
+          { key: 'cell', label: 'Cell reference (optional)', type: 'text', placeholder: 'e.g. B14 — leave blank for most complex' },
+          { key: 'depth', label: 'Depth', type: 'select', options: [{ value: 'quick', label: 'Quick overview' }, { value: 'detailed', label: 'Detailed breakdown' }] }
+        ],
+        buildPrompt: function(vals) {
+          var cell = vals.cell ? vals.cell.trim() : '';
+          var base = cell ? 'Explain the formula in ' + cell : 'Explain the most complex formula';
+          return vals.depth === 'detailed' ? base + ' in detail, including every nested function' : base;
+        }
+      },
+      workbook_format: {
+        placeholder: 'What formatting do you need?',
+        fields: [
+          { key: 'tabs', label: 'Tabs to format', type: 'checklist' },
+          { key: 'style', label: 'Style', type: 'select', options: [{ value: 'finance', label: 'Finance (blue inputs, black formulas)' }, { value: 'clean', label: 'Clean & minimal' }, { value: 'colorful', label: 'Colorful' }] },
+          { key: 'headers', label: 'Format headers', type: 'toggle', defaultVal: true },
+          { key: 'resize', label: 'Auto-resize columns', type: 'toggle', defaultVal: true }
+        ],
+        buildPrompt: function(vals) {
+          var parts = ['Format this workbook'];
+          if (vals.tabs && vals.tabs.length > 0 && vals.tabs.length < (cacheMeta ? cacheMeta.sheetCount : 99)) {
+            parts[0] = 'Format these tabs: ' + vals.tabs.join(', ');
+          }
+          if (vals.style === 'clean') parts.push('Use a clean, minimal style');
+          if (vals.style === 'colorful') parts.push('Use colorful formatting');
+          if (!vals.headers) parts.push('Skip header formatting');
+          if (!vals.resize) parts.push('Skip column auto-resize');
+          return parts.join('. ') + '.';
+        }
+      },
+      tab_audit: {
+        placeholder: 'What should I audit?',
+        fields: [
+          { key: 'hidden', label: 'Include hidden tabs', type: 'toggle', defaultVal: true },
+          { key: 'action', label: 'Action level', type: 'select', options: [{ value: 'report', label: 'Report only (no changes)' }, { value: 'color', label: 'Color-code tabs by status' }, { value: 'propose', label: 'Propose deletions for empty tabs' }] }
+        ],
+        buildPrompt: function(vals) {
+          var parts = ['Run a full tab audit on this workbook'];
+          if (!vals.hidden) parts.push('Skip hidden tabs');
+          if (vals.action === 'report') parts.push('Report only — don\'t make any changes');
+          if (vals.action === 'propose') parts.push('Propose deleting empty tabs');
+          return parts.join('. ') + '.';
+        }
+      },
+      prove_it: {
+        placeholder: 'What should I prove?',
+        fields: [
+          { key: 'what', label: 'What to verify (optional)', type: 'text', placeholder: 'Leave blank to verify last analysis' },
+          { key: 'formulas', label: 'Show all source formulas', type: 'toggle', defaultVal: true }
+        ],
+        buildPrompt: function(vals) {
+          var what = vals.what ? vals.what.trim() : '';
+          var base = what || 'Prove your last analysis';
+          return vals.formulas ? base + '. Show every source formula.' : base;
+        }
+      }
+    };
+
+    // Default config for non-guided skills
+    var PALETTE_DEFAULT = {
+      buildPrompt: function(vals) { return vals.question || ''; }
+    };
+
+    function buildPalette() {
+      var list = document.getElementById('paletteList');
+      list.innerHTML = '';
+
+      google.script.run
+        .withSuccessHandler(function(skills) {
+          // Group by category
+          PALETTE_CATEGORIES.forEach(function(cat) {
+            var catSkills = skills.filter(function(s) { return s.category === cat.key; });
+            if (catSkills.length === 0) return;
+
+            var catHeader = document.createElement('div');
+            catHeader.className = 'palette-category';
+            catHeader.textContent = cat.icon + ' ' + cat.label;
+            list.appendChild(catHeader);
+
+            catSkills.forEach(function(skill) {
+              var item = document.createElement('div');
+              item.className = 'palette-item';
+              item.dataset.id = skill.id;
+              item.dataset.name = skill.name.toLowerCase();
+              item.dataset.desc = (skill.description || '').toLowerCase();
+              item.innerHTML =
+                '<div class="palette-item-info">' +
+                  '<div class="palette-item-name">' + escapeHtml(skill.name) + '</div>' +
+                  '<div class="palette-item-desc">' + escapeHtml(skill.description || '') + '</div>' +
+                '</div>' +
+                '<span class="palette-model-tag ' + skill.modelTier + '">' + skill.modelTier + '</span>';
+              item.onclick = function() { selectPaletteSkill(skill.id, skill.name); };
+              list.appendChild(item);
+            });
+          });
+
+          // Custom Analysis at the bottom
+          var customHeader = document.createElement('div');
+          customHeader.className = 'palette-category';
+          customHeader.textContent = '💬 Custom';
+          list.appendChild(customHeader);
+
+          var customItem = document.createElement('div');
+          customItem.className = 'palette-item';
+          customItem.dataset.id = 'custom';
+          customItem.dataset.name = 'custom analysis';
+          customItem.dataset.desc = 'ask anything about this workbook';
+          customItem.innerHTML =
+            '<div class="palette-item-info">' +
+              '<div class="palette-item-name">Custom Analysis</div>' +
+              '<div class="palette-item-desc">Ask anything about this workbook</div>' +
+            '</div>';
+          customItem.onclick = function() { selectPaletteSkill(null, null); };
+          list.appendChild(customItem);
+        })
+        .getSkillRegistry();
+    }
+
+    function openPalette() {
+      var overlay = document.getElementById('paletteOverlay');
+      overlay.classList.add('visible');
+      // Position dropdown below trigger
+      var trigger = document.getElementById('paletteTrigger');
+      var dropdown = document.getElementById('paletteDropdown');
+      var rect = trigger.getBoundingClientRect();
+      dropdown.style.top = rect.bottom + 'px';
+      // Focus search
+      setTimeout(function() {
+        document.getElementById('paletteSearch').focus();
+      }, 50);
+    }
+
+    function closePalette() {
+      document.getElementById('paletteOverlay').classList.remove('visible');
+      document.getElementById('paletteSearch').value = '';
+      filterPalette('');
+      // Close guided form if open
+      var form = document.getElementById('guidedForm');
+      if (form) form.remove();
+    }
+
+    function filterPalette(query) {
+      var q = query.toLowerCase();
+      var items = document.querySelectorAll('.palette-item');
+      var categories = document.querySelectorAll('.palette-category');
+
+      items.forEach(function(item) {
+        var match = !q || item.dataset.name.indexOf(q) !== -1 || item.dataset.desc.indexOf(q) !== -1;
+        item.classList.toggle('hidden', !match);
+      });
+
+      // Hide empty categories
+      categories.forEach(function(cat) {
+        var next = cat.nextElementSibling;
+        var hasVisible = false;
+        while (next && !next.classList.contains('palette-category')) {
+          if (next.classList.contains('palette-item') && !next.classList.contains('hidden')) {
+            hasVisible = true;
+          }
+          next = next.nextElementSibling;
+        }
+        cat.style.display = hasVisible ? '' : 'none';
+      });
+    }
+
+    function selectPaletteSkill(skillId, skillName) {
+      var config = skillId ? PALETTE_SKILLS[skillId] : null;
+      var trigger = document.getElementById('paletteTrigger');
+
+      if (config && config.fields) {
+        // Show guided form
+        showGuidedForm(skillId, skillName, config);
+        return;
+      }
+
+      // Simple selection: set skill, close palette, focus textarea
+      selectedSkill = skillId;
+      if (skillId && skillName) {
+        trigger.textContent = skillName;
+        trigger.classList.add('has-skill');
+      } else {
+        trigger.textContent = 'What do you want to do?';
+        trigger.classList.remove('has-skill');
+      }
+
+      closePalette();
+      var textarea = document.getElementById('prompt');
+      textarea.placeholder = config && config.placeholder ? config.placeholder : 'Ask about this workbook...';
+      textarea.focus();
+    }
+
+    function showGuidedForm(skillId, skillName, config) {
+      // Remove existing form
+      var existing = document.getElementById('guidedForm');
+      if (existing) existing.remove();
+
+      var list = document.getElementById('paletteList');
+      var search = document.querySelector('.palette-search');
+
+      var form = document.createElement('div');
+      form.className = 'guided-form';
+      form.id = 'guidedForm';
+
+      var title = document.createElement('div');
+      title.className = 'guided-form-title';
+      title.innerHTML = '<button class="guided-form-back" onclick="closeGuidedForm()">←</button> ' + escapeHtml(skillName);
+      form.appendChild(title);
+
+      config.fields.forEach(function(field) {
+        var wrapper = document.createElement('div');
+        wrapper.className = 'guided-field';
+
+        if (field.type === 'text') {
+          wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>' +
+            '<input type="text" id="gf_' + field.key + '" placeholder="' + escapeHtml(field.placeholder || '') + '">';
+        } else if (field.type === 'select') {
+          var options = field.options.map(function(o) {
+            return '<option value="' + escapeHtml(o.value) + '">' + escapeHtml(o.label) + '</option>';
+          }).join('');
+          wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>' +
+            '<select id="gf_' + field.key + '">' + options + '</select>';
+        } else if (field.type === 'toggle') {
+          wrapper.className = 'guided-field guided-field-row';
+          wrapper.innerHTML =
+            '<label>' + escapeHtml(field.label) + '</label>' +
+            '<label class="guided-toggle">' +
+              '<input type="checkbox" id="gf_' + field.key + '"' + (field.defaultVal ? ' checked' : '') + '>' +
+              '<span class="guided-toggle-slider"></span>' +
+            '</label>';
+        } else if (field.type === 'checklist') {
+          wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>';
+          var checkboxes = document.createElement('div');
+          checkboxes.className = 'guided-checkboxes';
+          checkboxes.id = 'gf_' + field.key;
+          // Populate from cacheMeta.sheetNames
+          var names = cacheMeta ? cacheMeta.sheetNames : [];
+          if (names.length === 0) {
+            checkboxes.innerHTML = '<div style="padding:4px 8px;font-size:11px;color:#999;">Loading sheets...</div>';
+            // Try fetching
+            google.script.run
+              .withSuccessHandler(function(sheetNames) {
+                checkboxes.innerHTML = '';
+                sheetNames.forEach(function(name) {
+                  var lbl = document.createElement('label');
+                  lbl.className = 'guided-checkbox';
+                  lbl.innerHTML = '<input type="checkbox" value="' + escapeHtml(name) + '" checked> ' + escapeHtml(name);
+                  checkboxes.appendChild(lbl);
+                });
+              })
+              .getSheetNames();
+          } else {
+            names.forEach(function(name) {
+              var lbl = document.createElement('label');
+              lbl.className = 'guided-checkbox';
+              lbl.innerHTML = '<input type="checkbox" value="' + escapeHtml(name) + '" checked> ' + escapeHtml(name);
+              checkboxes.appendChild(lbl);
+            });
+          }
+          wrapper.appendChild(checkboxes);
+        }
+
+        form.appendChild(wrapper);
+      });
+
+      // Run button
+      var runBtn = document.createElement('button');
+      runBtn.className = 'guided-run-btn';
+      runBtn.textContent = 'Run ' + skillName;
+      runBtn.onclick = function() { runGuidedSkill(skillId, config); };
+      form.appendChild(runBtn);
+
+      // Insert before list, after search
+      search.parentNode.insertBefore(form, list);
+      list.style.display = 'none';
+      search.style.display = 'none';
+    }
+
+    function closeGuidedForm() {
+      var form = document.getElementById('guidedForm');
+      if (form) form.remove();
+      document.getElementById('paletteList').style.display = '';
+      document.querySelector('.palette-search').style.display = '';
+    }
+
+    function runGuidedSkill(skillId, config) {
+      // Gather field values
+      var vals = {};
+      config.fields.forEach(function(field) {
+        if (field.type === 'toggle') {
+          var el = document.getElementById('gf_' + field.key);
+          vals[field.key] = el ? el.checked : false;
+        } else if (field.type === 'checklist') {
+          var container = document.getElementById('gf_' + field.key);
+          var checked = [];
+          if (container) {
+            var inputs = container.querySelectorAll('input:checked');
+            for (var i = 0; i < inputs.length; i++) {
+              checked.push(inputs[i].value);
+            }
+          }
+          vals[field.key] = checked;
+        } else {
+          var el = document.getElementById('gf_' + field.key);
+          vals[field.key] = el ? el.value : '';
+        }
+      });
+
+      var prompt = config.buildPrompt(vals);
+      selectedSkill = skillId;
+
+      // Update trigger
+      var trigger = document.getElementById('paletteTrigger');
+      var skillName = trigger.textContent; // already set by guided form title
+      trigger.textContent = 'What do you want to do?';
+      trigger.classList.remove('has-skill');
+
+      closePalette();
+
+      // Send the prompt
+      document.getElementById('prompt').value = prompt;
+      send();
+    }
+
+    // ─── Onboarding / Example Prompts ──────────────────────────────────────
 
     /**
-     * Check if user has completed onboarding; show card if not.
+     * Check if user has completed onboarding. If no role saved, default to
+     * 'exploring' silently and show example prompt cards instead.
      */
     function checkOnboarding() {
       google.script.run
         .withSuccessHandler(function(role) {
           if (!role) {
-            document.getElementById('onboardingCard').style.display = 'block';
+            google.script.run.saveUserRole('exploring');
           }
+          // Pre-select the current role in settings panel
+          var radios = document.querySelectorAll('input[name="userRole"]');
+          var currentRole = role || 'exploring';
+          for (var i = 0; i < radios.length; i++) {
+            if (radios[i].value === currentRole) radios[i].checked = true;
+          }
+          // Show example prompts if no messages yet
+          showExamplePrompts();
         })
         .getUserRole();
     }
 
     /**
-     * Save selected role, hide card, show welcome message.
+     * Show example prompt cards in the chat area (disappear on first message).
      */
-    function completeOnboarding() {
-      var selected = document.querySelector('input[name="userRole"]:checked');
-      if (!selected) return;
-      var role = selected.value;
+    function showExamplePrompts() {
+      var container = document.getElementById('messages');
+      // Don't show if there are already user/assistant messages
+      if (container.querySelectorAll('.message.user, .message.assistant').length > 0) return;
+
+      var promptsDiv = document.createElement('div');
+      promptsDiv.className = 'example-prompts';
+      promptsDiv.id = 'examplePrompts';
+      promptsDiv.innerHTML = '<div class="example-prompts-label">Try one of these:</div>';
+
+      var examples = [
+        { text: "What's this workbook about?", skill: null },
+        { text: 'Format this workbook', skill: 'workbook_format' },
+        { text: 'Explain the formulas', skill: 'formula_xray' }
+      ];
+
+      examples.forEach(function(ex) {
+        var btn = document.createElement('button');
+        btn.className = 'example-prompt';
+        btn.textContent = ex.text;
+        btn.onclick = function() {
+          if (ex.skill) selectedSkill = ex.skill;
+          document.getElementById('prompt').value = ex.text;
+          send();
+        };
+        promptsDiv.appendChild(btn);
+      });
+
+      container.appendChild(promptsDiv);
+      scrollToBottom();
+    }
+
+    /**
+     * Remove example prompts from the chat area.
+     */
+    function removeExamplePrompts() {
+      var el = document.getElementById('examplePrompts');
+      if (el) el.remove();
+    }
+
+    /**
+     * Toggle the settings panel visibility.
+     */
+    function toggleSettings() {
+      var panel = document.getElementById('settingsPanel');
+      panel.classList.toggle('visible');
+    }
+
+    /**
+     * Save role from settings panel.
+     */
+    function saveRoleSetting(role) {
       google.script.run.saveUserRole(role);
-      document.getElementById('onboardingCard').style.display = 'none';
-      var roleLabels = {
-        builder: "Builder mode — I'll give you direct, technical feedback.",
-        reviewer: "Reviewer mode — I'll focus on flagging risks and inconsistencies.",
-        inherited: "Got it — I'll help you understand what the previous owner built.",
-        exploring: "Let's take a look around. Ask me anything about this workbook."
-      };
-      addMessage(roleLabels[role] || "Let's get started.", 'assistant');
+    }
+
+    /**
+     * Start a new chat — clear messages, state, and show example prompts.
+     */
+    function startNewChat() {
+      var container = document.getElementById('messages');
+      container.innerHTML = '<div class="message system">Ask a question, or pick a skill.</div>';
+      conversationHistory = [];
+      pendingActions = null;
+      selectedSkill = null;
+      google.script.run.saveChatHistory('');
+      showExamplePrompts();
     }
   </script>
 

@@ -252,17 +252,36 @@ function runHealthCheck() {
   SpreadsheetApp.getUi().alert('Health Check', result.summary || result.error || 'Complete.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
-// ─── Expanded View ──────────────────────────────────────────────────────────
+// ─── Structural Cache Warm ───────────────────────────────────────────────────
 
 /**
- * Opens the sidebar content in a larger modeless dialog.
+ * Warm the structural model cache and return sheet metadata.
+ * Called once on sidebar open to eliminate first-message cold start
+ * and provide Command Palette metadata (sheet names).
+ *
+ * @return {Object} { sheetNames: string[], sheetCount: number, activeSheet: string }
  */
-function openExpandedView() {
-  var html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .append('<script>var isDialogMode = true;</script>')
-    .setWidth(700)
-    .setHeight(750);
-  SpreadsheetApp.getUi().showModelessDialog(html, 'Crunchy Sheets');
+function warmStructuralCache() {
+  var model = getStructuralModelCached(); // builds + caches if not already cached
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  return {
+    sheetNames: sheets.map(function(s) { return s.getName(); }),
+    sheetCount: sheets.length,
+    activeSheet: ss.getActiveSheet().getName()
+  };
+}
+
+/**
+ * Return sheet names for Command Palette metadata.
+ * Lightweight call (~5ms, no serialization).
+ *
+ * @return {string[]} Array of sheet names.
+ */
+function getSheetNames() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheets().map(function(s) {
+    return s.getName();
+  });
 }
 
 // ─── Chat History Persistence ───────────────────────────────────────────────

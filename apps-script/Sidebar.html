@@ -978,6 +978,39 @@
       font-weight: 500; cursor: pointer; border-top: 1px solid #e8eaed;
     }
     .proof-link:hover { text-decoration: underline; }
+
+    /* ─── Markdown tables ──────────────────────────────────── */
+    .md-table {
+      width: 100%; border-collapse: collapse; font-size: 11px;
+      margin: 8px 0; line-height: 1.4;
+    }
+    .md-table th {
+      background: var(--accent-light); color: var(--accent);
+      font-weight: 600; text-align: left;
+      padding: 5px 8px; border: 1px solid var(--border);
+    }
+    .md-table td {
+      padding: 4px 8px; border: 1px solid var(--border);
+    }
+    .md-table tr:nth-child(even) td { background: #f9fafb; }
+
+    /* ─── Prove-it CTA ─────────────────────────────────────── */
+    .prove-it-cta {
+      margin-top: 8px; padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .prove-it-link {
+      font-size: 11px; color: var(--accent); opacity: 0.7;
+      cursor: pointer; text-decoration: none;
+    }
+    .prove-it-link:hover { opacity: 1; text-decoration: underline; }
+
+    /* ─── Keyboard hint ────────────────────────────────────── */
+    .keyboard-hint {
+      font-size: 9px; color: #999; padding: 2px 0 0;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .input-area:focus-within .keyboard-hint { opacity: 1; }
   </style>
 </head>
 <body>
@@ -1019,14 +1052,15 @@
   <div class="chat-container">
     <div class="messages" id="messages">
       <div class="message system">
-        Ask a question, or pick a skill.
+        I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or pick a skill below.
       </div>
     </div>
 
     <div class="input-area">
       <div class="slash-menu" id="slashMenu"></div>
-      <textarea id="prompt" rows="2" placeholder="Ask about this workbook..." onkeydown="handleKey(event)" oninput="handleSlashAutocomplete(this.value)"></textarea>
+      <textarea id="prompt" rows="2" placeholder="Ask a question or type / for commands..." onkeydown="handleKey(event)" oninput="handleSlashAutocomplete(this.value)"></textarea>
       <button id="sendBtn" onclick="send()">Send</button>
+      <div class="keyboard-hint">Enter to send · Shift+Enter for new line</div>
     </div>
   </div>
 
@@ -1201,14 +1235,13 @@
         if (lastAssistantText) {
           fullPrompt = '[Previous AI Response]\n' + lastAssistantText
             + '\n[/Previous AI Response]\n\n' + fullPrompt;
-        } else if (!selectedSkill) {
-          // No previous message + keyword auto-detect (not explicit chip)
-          // Short-circuit: show local message, don't hit API at all
+        } else {
+          // No previous message — short-circuit regardless of how Prove It was triggered
           setLoading(false);
+          removeTypingIndicator();
           addMessage('Nothing to verify yet — ask a question first, then say "prove it" to see the math.', 'assistant');
           return;
         }
-        // Explicit chip with no context: let it through — Claude will respond with the same message server-side
       }
 
       // Step 1: Get payload from Apps Script (structural or full, based on skill)
@@ -1572,6 +1605,24 @@
         pendingActions = parsed.actions;
         addActionsPanel(parsed.actions);
       }
+
+      // "Verify this answer" CTA for analysis-only responses (no actions, no xray)
+      var hasActions = parsed.actions && parsed.actions.length > 0;
+      if (!hasActions && !parsed.formulaXray && selectedSkill !== 'prove_it') {
+        var cta = document.createElement('div');
+        cta.className = 'prove-it-cta';
+        cta.innerHTML = '<span class="prove-it-link" onclick="triggerProveIt()">Verify this answer \u2192</span>';
+        msgDiv.appendChild(cta);
+      }
+    }
+
+    /**
+     * Trigger Prove It from the inline CTA link.
+     */
+    function triggerProveIt() {
+      selectedSkill = 'prove_it';
+      document.getElementById('prompt').value = 'Prove it — show your work';
+      send();
     }
 
     /**
@@ -1772,27 +1823,65 @@
     function renderMarkdown(text) {
       var lines = text.split('\n');
       var html = '';
-      var inList = false;
+      var inUl = false;
+      var inOl = false;
+
+      // Pre-scan for markdown tables: blocks of | delimited lines
+      // We'll process them inline below
 
       for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
 
+        // Table detection: line starts with |
+        if (/^\|/.test(line.trim())) {
+          if (inUl) { html += '</ul>'; inUl = false; }
+          if (inOl) { html += '</ol>'; inOl = false; }
+          // Collect all consecutive table lines
+          var tableLines = [];
+          while (i < lines.length && /^\|/.test(lines[i].trim())) {
+            tableLines.push(lines[i]);
+            i++;
+          }
+          i--; // back up since the for loop will increment
+          html += renderTable(tableLines);
+          continue;
+        }
+
+        // Horizontal rule: --- or *** or ___ (alone on line)
+        if (/^[\-\*_]{3,}\s*$/.test(line.trim()) && !(/^[\-\*] /.test(line))) {
+          if (inUl) { html += '</ul>'; inUl = false; }
+          if (inOl) { html += '</ol>'; inOl = false; }
+          html += '<hr>';
+          continue;
+        }
+
         // Headers: ### Header
         if (/^### (.+)/.test(line)) {
-          if (inList) { html += '</ul>'; inList = false; }
+          if (inUl) { html += '</ul>'; inUl = false; }
+          if (inOl) { html += '</ol>'; inOl = false; }
           html += '<h3>' + applyInline(line.replace(/^### /, '')) + '</h3>';
+          continue;
+        }
+
+        // Numbered list: 1. item
+        if (/^\d+\.\s+(.+)/.test(line)) {
+          if (inUl) { html += '</ul>'; inUl = false; }
+          if (!inOl) { html += '<ol>'; inOl = true; }
+          html += '<li>' + applyInline(line.replace(/^\d+\.\s+/, '')) + '</li>';
           continue;
         }
 
         // Bullet list: - item or * item
         if (/^[\-\*] (.+)/.test(line)) {
-          if (!inList) { html += '<ul>'; inList = true; }
+          if (inOl) { html += '</ol>'; inOl = false; }
+          if (!inUl) { html += '<ul>'; inUl = true; }
           html += '<li>' + applyInline(line.replace(/^[\-\*] /, '')) + '</li>';
           continue;
         }
 
-        // Close list if we're no longer in one
-        if (inList) { html += '</ul>'; inList = false; }
+        // Close lists if we're no longer in one
+        if (inUl) { html += '</ul>'; inUl = false; }
+        if (inOl) { html += '</ol>'; inOl = false; }
 
         // Empty line
         if (line.trim() === '') {
@@ -1804,7 +1893,36 @@
         html += '<p>' + applyInline(line) + '</p>';
       }
 
-      if (inList) { html += '</ul>'; }
+      if (inUl) { html += '</ul>'; }
+      if (inOl) { html += '</ol>'; }
+      return html;
+    }
+
+    /**
+     * Render a markdown table (array of | delimited lines) as an HTML table.
+     */
+    function renderTable(tableLines) {
+      if (tableLines.length < 2) return tableLines.map(function(l) { return '<p>' + applyInline(l) + '</p>'; }).join('');
+      var rows = [];
+      var isSeparator = function(line) { return /^\|[\s\-:|]+\|$/.test(line.trim()); };
+      for (var i = 0; i < tableLines.length; i++) {
+        if (isSeparator(tableLines[i])) continue; // skip |---|---| rows
+        var cells = tableLines[i].split('|').slice(1); // drop leading empty
+        if (cells.length > 0 && cells[cells.length - 1].trim() === '') cells.pop(); // drop trailing empty
+        rows.push(cells.map(function(c) { return c.trim(); }));
+      }
+      if (rows.length === 0) return '';
+      var html = '<table class="md-table">';
+      // First row is header
+      html += '<tr>';
+      rows[0].forEach(function(cell) { html += '<th>' + applyInline(cell) + '</th>'; });
+      html += '</tr>';
+      for (var r = 1; r < rows.length; r++) {
+        html += '<tr>';
+        rows[r].forEach(function(cell) { html += '<td>' + applyInline(cell) + '</td>'; });
+        html += '</tr>';
+      }
+      html += '</table>';
       return html;
     }
 
@@ -2285,9 +2403,9 @@
     function setLoadingPhase(phase) {
       var btn = document.getElementById('sendBtn');
       var labels = {
-        reading: 'Reading...', connecting: 'Connecting...', analyzing: 'Analyzing...',
-        building_proof: 'Building proof...', formatting: 'Formatting...',
-        auditing: 'Auditing tabs...', xraying: 'X-Raying...', fetching: 'Fetching data...'
+        reading: 'Looking at your spreadsheet...', connecting: 'Thinking...', analyzing: 'Working on your answer...',
+        building_proof: 'Building proof sheet...', formatting: 'Tidying up your workbook...',
+        auditing: 'Checking your tabs...', xraying: 'Analyzing formula...', fetching: 'Pulling in more data...'
       };
       var label = labels[phase] || 'Thinking...';
       btn.innerHTML = '<span class="spinner"></span>' + label;
@@ -2310,22 +2428,22 @@
      */
     function formatActionType(type) {
       var map = {
-        'set_value': 'value',
+        'set_value': 'write',
         'set_formula': 'formula',
-        'format_cell': 'format',
-        'add_sheet': 'sheet',
+        'format_cell': 'style',
+        'add_sheet': 'new tab',
         'rename_sheet': 'rename',
-        'add_named_range': 'range',
-        'activate_sheet': 'activate',
-        'set_column_width': 'width',
+        'add_named_range': 'named range',
+        'activate_sheet': 'switch tab',
+        'set_column_width': 'column width',
         'freeze_rows': 'freeze',
-        'format_range': 'format',
-        'set_border': 'border',
-        'auto_resize_columns': 'resize',
-        'delete_sheet': 'delete',
+        'format_range': 'style',
+        'set_border': 'borders',
+        'auto_resize_columns': 'auto-fit',
+        'delete_sheet': 'delete tab',
         'set_tab_color': 'tab color',
         'add_note': 'note',
-        'move_sheet': 'move'
+        'move_sheet': 'reorder'
       };
       return map[type] || type;
     }
@@ -2333,57 +2451,62 @@
     /**
      * Build a short description of an action locally (no server call needed).
      */
+    function friendlyColor(hex) {
+      if (!hex) return hex;
+      var map = { '#082fff': 'blue', '#000000': 'black', '#fff2cc': 'yellow', '#ffffff': 'white' };
+      return map[hex.toLowerCase()] || hex;
+    }
+
     function describeActionLocally(action) {
       switch (action.type) {
         case 'set_value':
           var val = String(action.value || '');
-          if (val.length > 25) val = val.substring(0, 24) + '…';
-          return action.cell + ' = "' + val + '" on ' + action.sheet;
+          if (val.length > 25) val = val.substring(0, 24) + '\u2026';
+          return 'Set ' + action.cell + " to '" + val + "' in " + action.sheet;
 
         case 'set_formula':
           var formula = action.formula || '';
-          if (formula.length > 35) formula = formula.substring(0, 34) + '…';
-          return action.cell + ' = ' + formula + ' on ' + action.sheet;
+          if (formula.length > 35) formula = formula.substring(0, 34) + '\u2026';
+          return 'Add formula ' + formula + ' in ' + action.cell + ' (' + action.sheet + ')';
 
         case 'format_cell':
           var parts = [];
           var fmt = action.format || {};
-          if (fmt.fontColor) parts.push(fmt.fontColor);
           if (fmt.bold) parts.push('bold');
+          if (fmt.fontColor) parts.push(friendlyColor(fmt.fontColor) + ' text');
           if (fmt.numberFormat) parts.push(fmt.numberFormat);
-          if (fmt.background || fmt.backgroundColor) parts.push('bg:' + (fmt.background || fmt.backgroundColor));
-          return action.cell + ' on ' + action.sheet + ' → ' + (parts.join(', ') || 'formatting');
+          if (fmt.background || fmt.backgroundColor) parts.push(friendlyColor(fmt.background || fmt.backgroundColor) + ' background');
+          return 'Style ' + action.cell + ' in ' + action.sheet + ': ' + (parts.join(', ') || 'formatting');
 
         case 'add_sheet':
-          return 'Create sheet "' + action.sheetName + '"';
+          return 'Create tab "' + action.sheetName + '"';
 
         case 'rename_sheet':
-          return '"' + action.sheet + '" → "' + action.sheetName + '"';
+          return 'Rename tab "' + action.sheet + '" to "' + action.sheetName + '"';
 
         case 'add_named_range':
-          return '"' + action.rangeName + '" → ' + action.rangeA1;
+          return 'Define "' + action.rangeName + '" as ' + action.rangeA1;
 
         case 'activate_sheet':
-          return 'Switch to "' + action.sheet + '"';
+          return 'Switch to tab "' + action.sheet + '"';
 
         case 'set_column_width':
-          return 'Column ' + action.column + ' → ' + action.width + 'px on ' + action.sheet;
+          return 'Set column ' + action.column + ' to ' + action.width + 'px in ' + action.sheet;
 
         case 'freeze_rows':
-          return 'Freeze ' + action.rows + ' row' + (action.rows !== 1 ? 's' : '') + ' on ' + action.sheet;
+          return 'Freeze ' + action.rows + ' row' + (action.rows !== 1 ? 's' : '') + ' in ' + action.sheet;
 
         case 'format_range':
           var fParts = [];
           var fFmt = action.format || {};
-          if (fFmt.fontColor) fParts.push(fFmt.fontColor);
           if (fFmt.bold) fParts.push('bold');
           if (fFmt.italic) fParts.push('italic');
+          if (fFmt.fontColor) fParts.push(friendlyColor(fFmt.fontColor) + ' text');
           if (fFmt.numberFormat) fParts.push(fFmt.numberFormat);
-          if (fFmt.background || fFmt.backgroundColor) fParts.push('bg:' + (fFmt.background || fFmt.backgroundColor));
-          if (fFmt.verticalAlignment) fParts.push('vAlign:' + fFmt.verticalAlignment);
-          if (fFmt.horizontalAlignment) fParts.push('hAlign:' + fFmt.horizontalAlignment);
-          if (fFmt.wrapStrategy) fParts.push('wrap:' + fFmt.wrapStrategy);
-          return action.range + ' on ' + action.sheet + ' \u2192 ' + (fParts.join(', ') || 'formatting');
+          if (fFmt.background || fFmt.backgroundColor) fParts.push(friendlyColor(fFmt.background || fFmt.backgroundColor) + ' background');
+          if (fFmt.horizontalAlignment) fParts.push(fFmt.horizontalAlignment.toLowerCase() + '-aligned');
+          if (fFmt.wrapStrategy) fParts.push('wrap');
+          return 'Style ' + action.range + ' in ' + action.sheet + ': ' + (fParts.join(', ') || 'formatting');
 
         case 'set_border':
           var bSides = [];
@@ -2391,24 +2514,24 @@
           if (action.bottom) bSides.push('bottom');
           if (action.left) bSides.push('left');
           if (action.right) bSides.push('right');
-          return action.range + ' on ' + action.sheet + ' \u2192 border (' + (bSides.join(', ') || 'all') + ')';
+          return 'Add borders to ' + action.range + ' in ' + action.sheet + (bSides.length ? ' (' + bSides.join(', ') + ')' : '');
 
         case 'auto_resize_columns':
-          return 'Columns ' + action.startColumn + '\u2013' + action.endColumn + ' on ' + action.sheet;
+          return 'Auto-fit columns ' + action.startColumn + '\u2013' + action.endColumn + ' in ' + action.sheet;
 
         case 'delete_sheet':
-          return 'Delete sheet "' + action.sheet + '"';
+          return 'Delete tab "' + action.sheet + '"';
 
         case 'set_tab_color':
-          return '"' + action.sheet + '" \u2192 ' + action.color;
+          return 'Color tab "' + action.sheet + '" ' + friendlyColor(action.color);
 
         case 'add_note':
           var noteText = action.note || '';
           if (noteText.length > 25) noteText = noteText.substring(0, 24) + '\u2026';
-          return action.cell + ' on ' + action.sheet + ': "' + noteText + '"';
+          return 'Add note to ' + action.cell + ' in ' + action.sheet + ': "' + noteText + '"';
 
         case 'move_sheet':
-          return '"' + action.sheet + '" \u2192 position ' + action.position;
+          return 'Move tab "' + action.sheet + '" to position ' + action.position;
 
         default:
           return JSON.stringify(action);
@@ -2949,7 +3072,7 @@
      */
     function startNewChat() {
       var container = document.getElementById('messages');
-      container.innerHTML = '<div class="message system">Ask a question, or pick a skill.</div>';
+      container.innerHTML = '<div class="message system">I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or pick a skill below.</div>';
       conversationHistory = [];
       pendingActions = null;
       selectedSkill = null;

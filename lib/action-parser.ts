@@ -16,6 +16,12 @@ export function parseClaudeResponse(claudeText: string): ParsedResponse {
     const trimmed = claudeText.trim();
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       jsonText = trimmed;
+    } else {
+      // Fallback: try to extract a JSON object containing actions or formula_xray
+      const fallbackMatch = claudeText.match(/\{[\s\S]*"(?:type|actions|formula_xray)"[\s\S]*\}/);
+      if (fallbackMatch) {
+        jsonText = fallbackMatch[0];
+      }
     }
   }
 

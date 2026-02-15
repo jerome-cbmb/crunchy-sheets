@@ -88,7 +88,7 @@ const SKILL_DEFINITIONS: SkillDefinition[] = [
     modelTier: 'sonnet',
     maxTokens: 8192,
     useFullContext: true,
-    keywords: /^(?!.*(?:number|date|cell)\s*format).*\b(housekeep|tidy|clean\s*up|polish|beautif|organize\s*(?:the\s*)?(?:workbook|tabs|sheets)|format\s+(?:the\s+)?(?:entire|whole|all|workbook|every)|make\s+(?:it|this)\s+(?:look\s+)?(?:nice|clean|professional|pretty))\b/i,
+    keywords: /^(?!.*(?:number|date|cell)\s*format).*\b(housekeep|tidy|clean\s*up|polish|beautif|prettify|spruce\s*up|organize\s*(?:the\s*)?(?:workbook|tabs|sheets)|format\s+(?:the\s+)?(?:entire|whole|all|workbook|every)|make\s+(?:it|this)\s+(?:look\s+)?(?:nice|clean|professional|pretty|presentable)|fix\s+the\s+(?:formatting|layout))\b/i,
     instruction: 'Format and organize this workbook. Apply professional financial formatting conventions and clean up the workbook structure.',
     systemAddendum: `
 WORKBOOK FORMAT & ORGANIZE MODE
@@ -145,7 +145,7 @@ Return the standard JSON with actions[] array. In your response text, briefly su
     modelTier: 'sonnet',
     maxTokens: 4096,
     useFullContext: true,
-    keywords: /explain.*formula|formula.*explain|x-ray|xray|break.*down.*formula|#explain|explain.*cell|what.*does.*formula/i,
+    keywords: /explain.*formula|formula.*explain|x-ray|xray|break.*down.*formula|#explain|explain.*cell|what.*does.*formula|what.*does.*this.*do|how.*does.*this.*work|what.*this.*cell|decode.*formula|walk\s+me\s+through/i,
     instruction: 'Analyze the formula in the specified cell. If no cell is specified, pick the most complex formula on the active sheet. Return ONLY the formula_xray JSON — do NOT return the normal actions/response format.',
     systemAddendum: `
 FORMULA X-RAY MODE — this overrides the normal action format.
@@ -208,7 +208,7 @@ Do NOT include an "actions" array. Do NOT include a "response" field. Return ONL
     modelTier: 'sonnet',
     maxTokens: 8192,
     useFullContext: true,
-    keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs/i,
+    keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs|get\s*rid\s*of.*tab|remove.*unused|which\s*tabs.*used|unnecessary\s*tab|check\s+(my\s+)?tabs/i,
     instruction: 'Audit every tab in this workbook. Classify each as Connected, Isolated, Empty, or Scratch based on the cross-reference graph. Flag problematic tabs with color-coded actions.',
     systemAddendum: `
 TAB AUDIT MODE — identify unused, orphan, and scratch tabs.
@@ -244,7 +244,7 @@ Return the standard JSON with actions[] array, response text, and summary.`,
     modelTier: 'opus',
     maxTokens: 12288,
     useFullContext: true,
-    keywords: /prove\s+it|show\s+(me\s+)?your\s+work|back\s+it\s+up|prove\s+(that|this|the\s+numbers)/i,
+    keywords: /prove\s+it|show\s+(me\s+)?your\s+work|back\s+it\s+up|prove\s+(that|this|the\s+numbers)|create\s+.*proof|verify\s+(that|this|the)|workpaper|work\s*paper|source\s+check|check\s+(your|the)\s+(math|numbers)/i,
     instruction: 'Build a proof tab that verifies your previous analysis. Create a sheet with formulas tracing every key number back to source cells. The proof must be auditable — every number from the workbook is a formula, never hardcoded.',
     systemAddendum: `
 PROVE IT MODE — build an auditable proof tab.

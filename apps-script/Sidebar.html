@@ -406,7 +406,7 @@
 
     .palette-list {
       overflow-y: auto;
-      max-height: calc(70vh - 60px);
+      max-height: calc(70vh - 20px);
       padding: 4px 0;
     }
 
@@ -457,42 +457,47 @@
       text-overflow: ellipsis;
     }
 
-    .palette-model-tag {
-      font-size: 9px;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-weight: 600;
-      flex-shrink: 0;
+    /* ─── Guided Form Card (inline in chat) ──────────────── */
+    .guided-form-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 8px;
+      max-width: 100%;
     }
 
-    .palette-model-tag.sonnet { background: #e8f0fe; color: #1a73e8; }
-    .palette-model-tag.opus { background: #f3e8fd; color: #7b1fa2; }
-
-    /* ─── Guided Form ─────────────────────────────────────── */
-    .guided-form {
-      padding: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .guided-form-title {
-      font-weight: 500;
-      font-size: 13px;
-      margin-bottom: 10px;
+    .guided-form-card-header {
       display: flex;
       align-items: center;
-      gap: 6px;
+      justify-content: space-between;
+      margin-bottom: 10px;
     }
 
-    .guided-form-back {
+    .guided-form-card-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .guided-form-card-close {
       background: none;
       border: none;
       cursor: pointer;
       font-size: 14px;
       color: var(--text-secondary);
       padding: 0 4px;
+      line-height: 1;
     }
 
-    .guided-form-back:hover { color: var(--accent); }
+    .guided-form-card-close:hover { color: var(--accent); }
+
+    .guided-form-card-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
 
     .guided-field {
       margin-bottom: 10px;
@@ -591,6 +596,146 @@
 
     .guided-checkbox:hover { background: var(--bg-warm); }
     .guided-checkbox input { margin: 0; }
+
+    /* ─── Range Field ────────────────────────────────────── */
+    .range-field {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .range-field input[type="text"] {
+      flex: 1;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-family: 'Roboto Mono', monospace;
+      outline: none;
+    }
+
+    .range-field input:focus { border-color: var(--accent); }
+
+    .range-field-btn {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 6px 8px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .range-field-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .range-field-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ─── Radio Group (for guided forms) ─────────────────── */
+    .guided-radio-group {
+      margin-bottom: 10px;
+    }
+
+    .guided-radio-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-primary);
+      padding: 6px 8px;
+      cursor: pointer;
+      border-radius: var(--radius);
+      transition: background 0.1s;
+    }
+
+    .guided-radio-group label:hover { background: var(--accent-light); }
+
+    .guided-radio-group input[type="radio"] {
+      margin-right: 6px;
+    }
+
+    /* ─── Feedback ────────────────────────────────────────── */
+    .sidebar-footer {
+      font-size: 10px;
+      color: var(--text-secondary);
+      text-align: center;
+      padding: 4px 0 2px;
+    }
+
+    .sidebar-footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .sidebar-footer a:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    .feedback-form {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+
+    .feedback-form-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .feedback-form textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+      margin-bottom: 8px;
+    }
+
+    .feedback-form textarea:focus { border-color: var(--accent); }
+
+    .feedback-file-row {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .feedback-toast {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      z-index: 200;
+      animation: fadeInOut 2.5s ease-in-out forwards;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+      15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+    }
 
     .guided-run-btn {
       width: 100%;
@@ -1062,9 +1207,6 @@
   <button class="palette-trigger" id="paletteTrigger" onclick="openPalette()">What do you want to do? &#x25BE;</button>
   <div class="palette-overlay" id="paletteOverlay" onclick="closePalette()">
     <div class="palette-dropdown" id="paletteDropdown" onclick="event.stopPropagation()">
-      <div class="palette-search">
-        <input type="text" id="paletteSearch" placeholder="Search skills..." oninput="filterPalette(this.value)">
-      </div>
       <div class="palette-list" id="paletteList"></div>
     </div>
   </div>
@@ -1082,6 +1224,7 @@
       <textarea id="prompt" rows="2" placeholder="Ask a question or type / for commands..." onkeydown="handleKey(event)" oninput="handleSlashAutocomplete(this.value)"></textarea>
       <button id="sendBtn" onclick="send()">Send</button>
       <div class="keyboard-hint">Enter to send · Shift+Enter for new line</div>
+      <div class="sidebar-footer"><a onclick="showFeedbackForm()">Send feedback</a> · v1.0</div>
     </div>
   </div>
 
@@ -2691,78 +2834,79 @@
 
     // ─── Command Palette ──────────────────────────────────────────────────
 
-    var PALETTE_CATEGORIES = [
-      { key: 'analysis', icon: '📊', label: 'Analysis' },
-      { key: 'modeling', icon: '📐', label: 'Modeling' },
-      { key: 'automation', icon: '⚡', label: 'Automation' },
-      { key: 'reporting', icon: '📋', label: 'Reporting' }
-    ];
-
-    var PALETTE_SKILLS = {
-      // ── Guided forms (4 skills) ──
+    // ─── Guided Form Configs (for inline chat cards) ──────────────────────
+    var GUIDED_FORMS = {
       formula_xray: {
-        placeholder: 'Which cell to analyze?',
+        title: 'Explain a Formula',
+        icon: '\ud83d\udd0d',
+        desc: null,
         fields: [
-          { key: 'cell', label: 'Cell reference (optional)', type: 'text', placeholder: 'e.g. B14 — leave blank for most complex' },
-          { key: 'depth', label: 'Depth', type: 'select', options: [{ value: 'quick', label: 'Quick overview' }, { value: 'detailed', label: 'Detailed breakdown' }] }
+          { key: 'cell', label: 'Cell or range', type: 'range', placeholder: 'e.g. B14' },
         ],
+        hint: 'Leave blank \u2192 picks most complex formula',
+        buttonLabel: 'Explain',
         buildPrompt: function(vals) {
           var cell = vals.cell ? vals.cell.trim() : '';
-          var base = cell ? 'Explain the formula in ' + cell : 'Explain the most complex formula';
-          return vals.depth === 'detailed' ? base + ' in detail, including every nested function' : base;
+          return cell ? 'Explain the formula in ' + cell : 'Explain the most complex formula on the active sheet';
         }
       },
       workbook_format: {
-        placeholder: 'What formatting do you need?',
+        title: 'Format & Organize',
+        icon: '\ud83e\uddf9',
+        desc: null,
         fields: [
-          { key: 'tabs', label: 'Tabs to format', type: 'checklist' },
-          { key: 'style', label: 'Style', type: 'select', options: [{ value: 'finance', label: 'Finance (blue inputs, black formulas)' }, { value: 'clean', label: 'Clean & minimal' }, { value: 'colorful', label: 'Colorful' }] },
-          { key: 'headers', label: 'Format headers', type: 'toggle', defaultVal: true },
-          { key: 'resize', label: 'Auto-resize columns', type: 'toggle', defaultVal: true }
+          { key: 'scope', label: 'What to format', type: 'radio', options: [
+            { value: 'workbook', label: 'Entire workbook', default: true },
+            { value: 'active', label: 'Active sheet only' },
+            { value: 'pick', label: 'Pick tabs...' }
+          ]},
+          { key: 'tabs', label: null, type: 'checklist', showWhen: 'scope=pick' }
         ],
+        buttonLabel: 'Format',
         buildPrompt: function(vals) {
-          var parts = ['Format this workbook'];
-          if (vals.tabs && vals.tabs.length > 0 && vals.tabs.length < (cacheMeta ? cacheMeta.sheetCount : 99)) {
-            parts[0] = 'Format these tabs: ' + vals.tabs.join(', ');
+          if (vals.scope === 'active') return 'Format the active sheet only.';
+          if (vals.scope === 'pick' && vals.tabs && vals.tabs.length > 0) {
+            return 'Format these tabs: ' + vals.tabs.join(', ') + '.';
           }
-          if (vals.style === 'clean') parts.push('Use a clean, minimal style');
-          if (vals.style === 'colorful') parts.push('Use colorful formatting');
-          if (!vals.headers) parts.push('Skip header formatting');
-          if (!vals.resize) parts.push('Skip column auto-resize');
-          return parts.join('. ') + '.';
+          return 'Run a full housekeeping sweep on this workbook.';
         }
       },
       tab_audit: {
-        placeholder: 'What should I audit?',
+        title: 'Workbook Cleanup',
+        icon: '\ud83d\uddc2',
+        desc: 'Scans all tabs (including hidden) to find unused, empty, or disconnected sheets. You\'ll confirm before anything is changed.',
         fields: [
-          { key: 'hidden', label: 'Include hidden tabs', type: 'toggle', defaultVal: true },
-          { key: 'action', label: 'Action level', type: 'select', options: [{ value: 'report', label: 'Report only (no changes)' }, { value: 'color', label: 'Color-code tabs by status' }, { value: 'propose', label: 'Propose deletions for empty tabs' }] }
+          { key: 'action', label: 'What should I do?', type: 'radio', options: [
+            { value: 'report', label: 'Just tell me what you find', default: true },
+            { value: 'color', label: 'Color-code tabs by status' },
+            { value: 'cleanup', label: 'Flag and clean up' }
+          ]}
         ],
+        buttonLabel: 'Clean Up Workbook',
         buildPrompt: function(vals) {
-          var parts = ['Run a full tab audit on this workbook'];
-          if (!vals.hidden) parts.push('Skip hidden tabs');
-          if (vals.action === 'report') parts.push('Report only — don\'t make any changes');
-          if (vals.action === 'propose') parts.push('Propose deleting empty tabs');
-          return parts.join('. ') + '.';
+          var base = 'Run a full tab audit on this workbook';
+          if (vals.action === 'report') return base + '. Report only \u2014 don\'t make any changes.';
+          if (vals.action === 'color') return base + '. Color-code tabs by status.';
+          return base + '. Propose deleting empty tabs.';
         }
       },
       prove_it: {
-        placeholder: 'What should I prove?',
+        title: 'Prove It!',
+        icon: '\u2705',
+        desc: 'Creates a new "Proof" tab that traces every number back to its source cells and formulas \u2014 a dynamic audit trail.',
         fields: [
-          { key: 'what', label: 'What to verify (optional)', type: 'text', placeholder: 'Leave blank to verify last analysis' },
-          { key: 'formulas', label: 'Show all source formulas', type: 'toggle', defaultVal: true }
+          { key: 'cell', label: 'Which cell or claim?', type: 'range', placeholder: 'e.g. D15' },
+          { key: 'context', label: 'What are you checking? (optional)', type: 'text', placeholder: 'e.g. total revenue looks high' }
         ],
+        hint: 'Leave blank \u2192 proves last result',
+        buttonLabel: 'Prove It',
         buildPrompt: function(vals) {
-          var what = vals.what ? vals.what.trim() : '';
-          var base = what || 'Prove your last analysis';
-          return vals.formulas ? base + '. Show every source formula.' : base;
+          var cell = vals.cell ? vals.cell.trim() : '';
+          var ctx = vals.context ? vals.context.trim() : '';
+          var base = cell ? 'Prove the number in ' + cell : 'Prove your last analysis';
+          return ctx ? base + '. ' + ctx + '.' : base + '.';
         }
       }
-    };
-
-    // Default config for non-guided skills
-    var PALETTE_DEFAULT = {
-      buildPrompt: function(vals) { return vals.question || ''; }
     };
 
     function buildPalette() {
@@ -2771,52 +2915,34 @@
 
       google.script.run
         .withSuccessHandler(function(skills) {
-          // Group by category
-          PALETTE_CATEGORIES.forEach(function(cat) {
-            var catSkills = skills.filter(function(s) { return s.category === cat.key; });
-            if (catSkills.length === 0) return;
-
-            var catHeader = document.createElement('div');
-            catHeader.className = 'palette-category';
-            catHeader.textContent = cat.icon + ' ' + cat.label;
-            list.appendChild(catHeader);
-
-            catSkills.forEach(function(skill) {
-              var item = document.createElement('div');
-              item.className = 'palette-item';
-              item.dataset.id = skill.id;
-              item.dataset.name = skill.name.toLowerCase();
-              item.dataset.desc = (skill.description || '').toLowerCase();
-              var tierLabel = skill.modelTier === 'opus' ? 'Deep' : 'Fast';
-              var tierTitle = skill.modelTier === 'opus'
-                ? 'Uses deeper reasoning for complex analysis'
-                : 'Uses a faster AI model';
-              item.innerHTML =
-                '<div class="palette-item-info">' +
-                  '<div class="palette-item-name">' + (skill.icon ? skill.icon + ' ' : '') + escapeHtml(skill.name) + '</div>' +
-                  '<div class="palette-item-desc">' + escapeHtml(skill.description || '') + '</div>' +
-                '</div>' +
-                '<span class="palette-model-tag ' + skill.modelTier + '" title="' + tierTitle + '">' + tierLabel + '</span>';
-              item.onclick = function() { selectPaletteSkill(skill.id, skill.name, skill.icon); };
-              list.appendChild(item);
-            });
+          // Filter to showInUI skills only, flat list
+          var visible = skills.filter(function(s) { return s.showInUI; });
+          visible.forEach(function(skill) {
+            var item = document.createElement('div');
+            item.className = 'palette-item';
+            item.dataset.id = skill.id;
+            item.innerHTML =
+              '<div class="palette-item-info">' +
+                '<div class="palette-item-name">' + (skill.icon ? skill.icon + ' ' : '') + escapeHtml(skill.name) + '</div>' +
+                '<div class="palette-item-desc">' + escapeHtml(skill.description || '') + '</div>' +
+              '</div>';
+            item.onclick = function() { selectPaletteSkill(skill.id, skill.name, skill.icon); };
+            list.appendChild(item);
           });
 
-          // Custom Analysis at the bottom
-          var customHeader = document.createElement('div');
-          customHeader.className = 'palette-category';
-          customHeader.textContent = '💬 Custom';
-          list.appendChild(customHeader);
+          // Divider
+          var divider = document.createElement('div');
+          divider.style.cssText = 'border-top:1px dashed var(--border);margin:4px 12px;';
+          list.appendChild(divider);
 
+          // Ask anything
           var customItem = document.createElement('div');
           customItem.className = 'palette-item';
           customItem.dataset.id = 'custom';
-          customItem.dataset.name = 'custom analysis';
-          customItem.dataset.desc = 'ask anything about this workbook';
           customItem.innerHTML =
             '<div class="palette-item-info">' +
-              '<div class="palette-item-name">Custom Analysis</div>' +
-              '<div class="palette-item-desc">Ask anything about this workbook</div>' +
+              '<div class="palette-item-name">\ud83d\udcac Ask anything</div>' +
+              '<div class="palette-item-desc">Free-form question about your workbook</div>' +
             '</div>';
           customItem.onclick = function() { selectPaletteSkill(null, null); };
           list.appendChild(customItem);
@@ -2827,185 +2953,219 @@
     function openPalette() {
       var overlay = document.getElementById('paletteOverlay');
       overlay.classList.add('visible');
-      // Position dropdown below trigger
       var trigger = document.getElementById('paletteTrigger');
       var dropdown = document.getElementById('paletteDropdown');
       var rect = trigger.getBoundingClientRect();
       dropdown.style.top = rect.bottom + 'px';
-      // Focus search
-      setTimeout(function() {
-        document.getElementById('paletteSearch').focus();
-      }, 50);
     }
 
     function closePalette() {
       document.getElementById('paletteOverlay').classList.remove('visible');
-      document.getElementById('paletteSearch').value = '';
-      filterPalette('');
-      // Close guided form if open
-      var form = document.getElementById('guidedForm');
-      if (form) form.remove();
-    }
-
-    function filterPalette(query) {
-      var q = query.toLowerCase();
-      var items = document.querySelectorAll('.palette-item');
-      var categories = document.querySelectorAll('.palette-category');
-
-      items.forEach(function(item) {
-        var match = !q || item.dataset.name.indexOf(q) !== -1 || item.dataset.desc.indexOf(q) !== -1;
-        item.classList.toggle('hidden', !match);
-      });
-
-      // Hide empty categories
-      categories.forEach(function(cat) {
-        var next = cat.nextElementSibling;
-        var hasVisible = false;
-        while (next && !next.classList.contains('palette-category')) {
-          if (next.classList.contains('palette-item') && !next.classList.contains('hidden')) {
-            hasVisible = true;
-          }
-          next = next.nextElementSibling;
-        }
-        cat.style.display = hasVisible ? '' : 'none';
-      });
     }
 
     function selectPaletteSkill(skillId, skillName, skillIcon) {
-      var config = skillId ? PALETTE_SKILLS[skillId] : null;
+      var config = skillId ? GUIDED_FORMS[skillId] : null;
       var trigger = document.getElementById('paletteTrigger');
 
-      if (config && config.fields) {
-        // Show guided form
-        showGuidedForm(skillId, skillName, config);
+      closePalette();
+
+      if (config) {
+        // Show guided form card inline in chat
+        showInlineGuidedForm(skillId, config);
         return;
       }
 
-      // Simple selection: set skill, close palette, focus textarea
-      selectedSkill = skillId;
-      if (skillId && skillName) {
-        var iconPrefix = skillIcon ? skillIcon + ' ' : '';
-        trigger.innerHTML = iconPrefix + escapeHtml(skillName) + ' <span class="palette-clear" onclick="event.stopPropagation(); selectPaletteSkill(null, null);">\u2715</span>';
-        trigger.classList.add('has-skill');
-      } else {
-        trigger.innerHTML = 'What do you want to do? &#x25BE;';
-        trigger.classList.remove('has-skill');
-      }
-
-      closePalette();
-      var textarea = document.getElementById('prompt');
-      textarea.placeholder = config && config.placeholder ? config.placeholder : 'Ask about this workbook...';
-      textarea.focus();
+      // "Ask anything" — just focus textarea
+      selectedSkill = null;
+      trigger.innerHTML = 'What do you want to do? &#x25BE;';
+      trigger.classList.remove('has-skill');
+      document.getElementById('prompt').focus();
     }
 
-    function showGuidedForm(skillId, skillName, config) {
-      // Remove existing form
-      var existing = document.getElementById('guidedForm');
+    /**
+     * Show a guided form card inline in the chat area (at the bottom of #messages).
+     */
+    function showInlineGuidedForm(skillId, config) {
+      // Remove any existing guided form card
+      var existing = document.getElementById('guidedFormCard');
       if (existing) existing.remove();
 
-      var list = document.getElementById('paletteList');
-      var search = document.querySelector('.palette-search');
+      var container = document.getElementById('messages');
+      var card = document.createElement('div');
+      card.className = 'guided-form-card';
+      card.id = 'guidedFormCard';
 
-      var form = document.createElement('div');
-      form.className = 'guided-form';
-      form.id = 'guidedForm';
+      // Header
+      var header = document.createElement('div');
+      header.className = 'guided-form-card-header';
+      header.innerHTML =
+        '<span class="guided-form-card-title">' + (config.icon || '') + ' ' + escapeHtml(config.title) + '</span>' +
+        '<button class="guided-form-card-close" onclick="removeGuidedFormCard()">\u2715</button>';
+      card.appendChild(header);
 
-      var title = document.createElement('div');
-      title.className = 'guided-form-title';
-      title.innerHTML = '<button class="guided-form-back" onclick="closeGuidedForm()">←</button> ' + escapeHtml(skillName);
-      form.appendChild(title);
+      // Description
+      if (config.desc) {
+        var desc = document.createElement('div');
+        desc.className = 'guided-form-card-desc';
+        desc.textContent = config.desc;
+        card.appendChild(desc);
+      }
 
+      // Fields
       config.fields.forEach(function(field) {
         var wrapper = document.createElement('div');
         wrapper.className = 'guided-field';
 
-        if (field.type === 'text') {
-          wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>' +
-            '<input type="text" id="gf_' + field.key + '" placeholder="' + escapeHtml(field.placeholder || '') + '">';
-        } else if (field.type === 'select') {
-          var options = field.options.map(function(o) {
-            return '<option value="' + escapeHtml(o.value) + '">' + escapeHtml(o.label) + '</option>';
-          }).join('');
-          wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>' +
-            '<select id="gf_' + field.key + '">' + options + '</select>';
-        } else if (field.type === 'toggle') {
-          wrapper.className = 'guided-field guided-field-row';
-          wrapper.innerHTML =
-            '<label>' + escapeHtml(field.label) + '</label>' +
-            '<label class="guided-toggle">' +
-              '<input type="checkbox" id="gf_' + field.key + '"' + (field.defaultVal ? ' checked' : '') + '>' +
-              '<span class="guided-toggle-slider"></span>' +
-            '</label>';
+        if (field.type === 'range') {
+          if (field.label) {
+            wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>';
+          }
+          var rangeDiv = document.createElement('div');
+          rangeDiv.className = 'range-field';
+          rangeDiv.innerHTML =
+            '<input type="text" id="gf_' + field.key + '" placeholder="' + escapeHtml(field.placeholder || '') + '">' +
+            '<button class="range-field-btn" id="gf_' + field.key + '_btn" onclick="useSelection(\'' + field.key + '\')">\ud83d\udccd Use Selection</button>';
+          wrapper.appendChild(rangeDiv);
+        } else if (field.type === 'text') {
+          if (field.label) {
+            wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>';
+          }
+          var inp = document.createElement('input');
+          inp.type = 'text';
+          inp.id = 'gf_' + field.key;
+          inp.placeholder = field.placeholder || '';
+          inp.style.cssText = 'width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;outline:none;';
+          wrapper.appendChild(inp);
+        } else if (field.type === 'radio') {
+          if (field.label) {
+            var lbl = document.createElement('label');
+            lbl.style.cssText = 'display:block;font-size:11px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;';
+            lbl.textContent = field.label;
+            wrapper.appendChild(lbl);
+          }
+          var radioGroup = document.createElement('div');
+          radioGroup.className = 'guided-radio-group';
+          radioGroup.id = 'gf_' + field.key;
+          field.options.forEach(function(opt) {
+            var rl = document.createElement('label');
+            rl.innerHTML = '<input type="radio" name="gf_radio_' + field.key + '" value="' + escapeHtml(opt.value) + '"' +
+              (opt.default ? ' checked' : '') + '> ' + escapeHtml(opt.label);
+            rl.querySelector('input').addEventListener('change', function() {
+              handleRadioChange(skillId, field.key, opt.value);
+            });
+            radioGroup.appendChild(rl);
+          });
+          wrapper.appendChild(radioGroup);
         } else if (field.type === 'checklist') {
-          wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>';
-          var checkboxes = document.createElement('div');
-          checkboxes.className = 'guided-checkboxes';
-          checkboxes.id = 'gf_' + field.key;
-          // Populate from cacheMeta.sheetNames
+          var checkDiv = document.createElement('div');
+          checkDiv.className = 'guided-checkboxes';
+          checkDiv.id = 'gf_' + field.key;
+          // Show/hide based on showWhen
+          if (field.showWhen) checkDiv.style.display = 'none';
           var names = cacheMeta ? cacheMeta.sheetNames : [];
           if (names.length === 0) {
-            checkboxes.innerHTML = '<div style="padding:4px 8px;font-size:11px;color:#999;">Loading sheets...</div>';
-            // Try fetching
+            checkDiv.innerHTML = '<div style="padding:4px 8px;font-size:11px;color:#999;">Loading...</div>';
             google.script.run
               .withSuccessHandler(function(sheetNames) {
-                checkboxes.innerHTML = '';
+                checkDiv.innerHTML = '';
                 sheetNames.forEach(function(name) {
-                  var lbl = document.createElement('label');
-                  lbl.className = 'guided-checkbox';
-                  lbl.innerHTML = '<input type="checkbox" value="' + escapeHtml(name) + '" checked> ' + escapeHtml(name);
-                  checkboxes.appendChild(lbl);
+                  var cl = document.createElement('label');
+                  cl.className = 'guided-checkbox';
+                  cl.innerHTML = '<input type="checkbox" value="' + escapeHtml(name) + '" checked> ' + escapeHtml(name);
+                  checkDiv.appendChild(cl);
                 });
               })
               .getSheetNames();
           } else {
             names.forEach(function(name) {
-              var lbl = document.createElement('label');
-              lbl.className = 'guided-checkbox';
-              lbl.innerHTML = '<input type="checkbox" value="' + escapeHtml(name) + '" checked> ' + escapeHtml(name);
-              checkboxes.appendChild(lbl);
+              var cl = document.createElement('label');
+              cl.className = 'guided-checkbox';
+              cl.innerHTML = '<input type="checkbox" value="' + escapeHtml(name) + '" checked> ' + escapeHtml(name);
+              checkDiv.appendChild(cl);
             });
           }
-          wrapper.appendChild(checkboxes);
+          wrapper.appendChild(checkDiv);
         }
 
-        form.appendChild(wrapper);
+        card.appendChild(wrapper);
       });
+
+      // Hint
+      if (config.hint) {
+        var hint = document.createElement('div');
+        hint.style.cssText = 'font-size:10px;color:var(--text-secondary);margin-bottom:10px;';
+        hint.textContent = config.hint;
+        card.appendChild(hint);
+      }
 
       // Run button
       var runBtn = document.createElement('button');
       runBtn.className = 'guided-run-btn';
-      runBtn.textContent = 'Run ' + skillName;
-      runBtn.onclick = function() { runGuidedSkill(skillId, config); };
-      form.appendChild(runBtn);
+      runBtn.textContent = config.buttonLabel || 'Run';
+      runBtn.onclick = function() { runInlineGuidedSkill(skillId, config); };
+      card.appendChild(runBtn);
 
-      // Insert before list, after search
-      search.parentNode.insertBefore(form, list);
-      list.style.display = 'none';
-      search.style.display = 'none';
+      container.appendChild(card);
+      scrollToBottom();
     }
 
-    function closeGuidedForm() {
-      var form = document.getElementById('guidedForm');
-      if (form) form.remove();
-      document.getElementById('paletteList').style.display = '';
-      document.querySelector('.palette-search').style.display = '';
+    /**
+     * Handle radio change for conditional field visibility (e.g. "Pick tabs..." checklist).
+     */
+    function handleRadioChange(skillId, fieldKey, value) {
+      var config = GUIDED_FORMS[skillId];
+      if (!config) return;
+      config.fields.forEach(function(f) {
+        if (f.showWhen) {
+          var parts = f.showWhen.split('=');
+          var el = document.getElementById('gf_' + f.key);
+          if (el) el.style.display = (parts[0] === fieldKey && parts[1] === value) ? '' : 'none';
+        }
+      });
     }
 
-    function runGuidedSkill(skillId, config) {
-      // Gather field values
+    /**
+     * Use Selection button — calls getSelectedRange() and populates the input.
+     */
+    function useSelection(fieldKey) {
+      var btn = document.getElementById('gf_' + fieldKey + '_btn');
+      var input = document.getElementById('gf_' + fieldKey);
+      if (!btn || !input) return;
+      btn.textContent = 'Reading...';
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function(rangeStr) {
+          if (rangeStr) input.value = rangeStr;
+          btn.textContent = '\ud83d\udccd Use Selection';
+          btn.disabled = false;
+        })
+        .withFailureHandler(function() {
+          btn.textContent = '\ud83d\udccd Use Selection';
+          btn.disabled = false;
+        })
+        .getSelectedRange();
+    }
+
+    function removeGuidedFormCard() {
+      var el = document.getElementById('guidedFormCard');
+      if (el) el.remove();
+    }
+
+    /**
+     * Gather values from inline guided form and send.
+     */
+    function runInlineGuidedSkill(skillId, config) {
       var vals = {};
       config.fields.forEach(function(field) {
-        if (field.type === 'toggle') {
-          var el = document.getElementById('gf_' + field.key);
-          vals[field.key] = el ? el.checked : false;
+        if (field.type === 'radio') {
+          var checked = document.querySelector('#gf_' + field.key + ' input[type="radio"]:checked');
+          vals[field.key] = checked ? checked.value : '';
         } else if (field.type === 'checklist') {
           var container = document.getElementById('gf_' + field.key);
           var checked = [];
           if (container) {
             var inputs = container.querySelectorAll('input:checked');
-            for (var i = 0; i < inputs.length; i++) {
-              checked.push(inputs[i].value);
-            }
+            for (var i = 0; i < inputs.length; i++) checked.push(inputs[i].value);
           }
           vals[field.key] = checked;
         } else {
@@ -3017,16 +3177,82 @@
       var prompt = config.buildPrompt(vals);
       selectedSkill = skillId;
 
-      // Update trigger
-      var trigger = document.getElementById('paletteTrigger');
-      trigger.innerHTML = 'What do you want to do? &#x25BE;';
-      trigger.classList.remove('has-skill');
-
-      closePalette();
+      // Remove the card
+      removeGuidedFormCard();
 
       // Send the prompt
       document.getElementById('prompt').value = prompt;
       send();
+    }
+
+    // ─── Feedback ──────────────────────────────────────────────────────────
+
+    function showFeedbackForm() {
+      // Remove existing
+      var existing = document.getElementById('feedbackFormCard');
+      if (existing) { existing.remove(); return; }
+
+      var container = document.getElementById('messages');
+      var card = document.createElement('div');
+      card.className = 'feedback-form';
+      card.id = 'feedbackFormCard';
+      card.innerHTML =
+        '<div class="feedback-form-header">' +
+          '<span>Send Feedback</span>' +
+          '<button class="guided-form-card-close" onclick="document.getElementById(\'feedbackFormCard\').remove()">\u2715</button>' +
+        '</div>' +
+        '<textarea id="feedbackText" placeholder="What\'s on your mind?"></textarea>' +
+        '<div class="feedback-file-row">\ud83d\udcce Attach screenshot (optional) <input type="file" id="feedbackFile" accept="image/*" style="font-size:11px;margin-left:4px;"></div>' +
+        '<button class="guided-run-btn" onclick="submitFeedback()">Send Feedback</button>';
+      container.appendChild(card);
+      scrollToBottom();
+      setTimeout(function() { document.getElementById('feedbackText').focus(); }, 50);
+    }
+
+    function submitFeedback() {
+      var text = document.getElementById('feedbackText').value.trim();
+      if (!text) return;
+      var fileInput = document.getElementById('feedbackFile');
+      var btn = document.querySelector('#feedbackFormCard .guided-run-btn');
+      btn.textContent = 'Sending...';
+      btn.disabled = true;
+
+      function doSend(screenshotB64) {
+        fetch(VERCEL_API_BASE + '/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: text,
+            screenshot_base64: screenshotB64 || null,
+            userEmail: cacheMeta ? '' : '' // email comes from server-side auth if needed
+          })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function() {
+          document.getElementById('feedbackFormCard').remove();
+          showFeedbackToast();
+        })
+        .catch(function() {
+          btn.textContent = 'Send Feedback';
+          btn.disabled = false;
+        });
+      }
+
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) { doSend(e.target.result); };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        doSend(null);
+      }
+    }
+
+    function showFeedbackToast() {
+      var toast = document.createElement('div');
+      toast.className = 'feedback-toast';
+      toast.textContent = 'Thanks! Feedback sent.';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 2600);
     }
 
     // ─── Onboarding / Example Prompts ──────────────────────────────────────
@@ -3067,9 +3293,9 @@
       promptsDiv.innerHTML = '<div class="example-prompts-label">Try one of these:</div>';
 
       var examples = [
-        { text: "What's this workbook about?", skill: null },
-        { text: 'Format this workbook', skill: 'workbook_format' },
-        { text: 'Explain the formulas', skill: 'formula_xray' }
+        { text: "What's in this workbook?", skill: null, guided: false },
+        { text: 'Explain a formula', skill: 'formula_xray', guided: true },
+        { text: 'Clean up formatting', skill: 'workbook_format', guided: true }
       ];
 
       examples.forEach(function(ex) {
@@ -3077,9 +3303,13 @@
         btn.className = 'example-prompt';
         btn.textContent = ex.text;
         btn.onclick = function() {
-          if (ex.skill) selectedSkill = ex.skill;
-          document.getElementById('prompt').value = ex.text;
-          send();
+          removeExamplePrompts();
+          if (ex.guided && GUIDED_FORMS[ex.skill]) {
+            showInlineGuidedForm(ex.skill, GUIDED_FORMS[ex.skill]);
+          } else {
+            document.getElementById('prompt').value = ex.text;
+            send();
+          }
         };
         promptsDiv.appendChild(btn);
       });

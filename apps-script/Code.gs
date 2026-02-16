@@ -55,6 +55,18 @@ function showSidebar() {
 }
 
 /**
+ * Opens the expanded chat view as a modeless dialog (700x750).
+ * Chat state is transferred via UserProperties (saveChatHistory / loadChatHistory).
+ */
+function openExpandedView() {
+  var html = HtmlService.createHtmlOutputFromFile('Sidebar')
+    .append('<script>var isDialogMode = true;</script>')
+    .setWidth(700)
+    .setHeight(750);
+  SpreadsheetApp.getUi().showModelessDialog(html, 'Crunchy Sheets');
+}
+
+/**
  * Shows an about dialog.
  */
 function showAbout() {

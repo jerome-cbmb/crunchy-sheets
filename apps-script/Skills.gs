@@ -100,33 +100,37 @@ var SKILLS = [
     id: 'workbook_format',
     name: 'Format & Organize',
     icon: '\ud83e\uddf9',
-    description: 'Full workbook housekeeping \u2014 formatting, alignment, cleanup, tab organization.',
+    description: 'Clean up formatting, headers, and layout.',
     modelTier: 'sonnet',
-    category: 'automation'
+    category: 'automation',
+    showInUI: true
   },
   {
     id: 'formula_xray',
-    name: 'Formula X-Ray',
-    icon: '\ud83d\udd2c',
-    description: 'Break down any formula into color-coded components with plain-English explanations.',
+    name: 'Explain a Formula',
+    icon: '\ud83d\udd0d',
+    description: 'Break down any formula in plain English.',
     modelTier: 'sonnet',
-    category: 'analysis'
+    category: 'analysis',
+    showInUI: true
   },
   {
     id: 'prove_it',
-    name: 'Prove It',
+    name: 'Prove It!',
     icon: '\u2705',
-    description: 'Build an auditable proof tab tracing every claimed number back to source cells.',
+    description: 'Build a proof tab tracing numbers to source data.',
     modelTier: 'opus',
-    category: 'analysis'
+    category: 'analysis',
+    showInUI: true
   },
   {
     id: 'tab_audit',
-    name: 'Tab Audit',
+    name: 'Workbook Cleanup',
     icon: '\ud83d\uddc2',
-    description: 'Identify unused, orphan, and scratch tabs. Color-code by status.',
+    description: 'Identify unused, empty, or disconnected tabs.',
     modelTier: 'sonnet',
-    category: 'automation'
+    category: 'automation',
+    showInUI: true
   }
 ];
 

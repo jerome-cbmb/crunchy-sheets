@@ -208,7 +208,7 @@ Do NOT include an "actions" array. Do NOT include a "response" field. Return ONL
     modelTier: 'sonnet',
     maxTokens: 8192,
     useFullContext: true,
-    keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs|get\s*rid\s*of.*tab|remove.*unused|which\s*tabs.*used|unnecessary\s*tab|check\s+(my\s+)?tabs/i,
+    keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs|get\s*rid\s*of.*tab|remove.*unused|which\s*tabs.*used|unnecessary\s*tab|check\s+(my\s+)?tabs|workbook.*clean|clean.*workbook/i,
     instruction: 'Audit every tab in this workbook. Classify each as Connected, Isolated, Empty, or Scratch based on the cross-reference graph. Flag problematic tabs with color-coded actions.',
     systemAddendum: `
 TAB AUDIT MODE — identify unused, orphan, and scratch tabs.

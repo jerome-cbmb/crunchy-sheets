@@ -349,6 +349,19 @@ function navigateToCell(sheetName, cellRef) {
   if (cellRef) sheet.setActiveSelection(cellRef);
 }
 
+// ─── Range Selector ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the currently selected range as "SheetName!A1Notation".
+ * Called from sidebar range selector component.
+ * @return {string} e.g. "Dashboard!B2:F20", or empty string if nothing selected.
+ */
+function getSelectedRange() {
+  var range = SpreadsheetApp.getActiveRange();
+  if (!range) return '';
+  return range.getSheet().getName() + '!' + range.getA1Notation();
+}
+
 // ─── Two-Pass Architecture ──────────────────────────────────────────────────
 
 /**

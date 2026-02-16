@@ -1242,19 +1242,6 @@
 
     // ─── Init ───────────────────────────────────────────────────────────
     (function init() {
-      // Proactive auth check — triggers scope grant prompt on copied/new scripts
-      google.script.run
-        .withSuccessHandler(function(status) {
-          if (!status.authorized) {
-            addMessage('⚠ Authorization needed. Please close and reopen the sidebar to grant permissions.', 'system');
-          }
-        })
-        .withFailureHandler(function(err) {
-          // Auth failure here means scopes aren't granted — Apps Script will show its own prompt
-          console.warn('[Auth] Pre-check failed:', err.message);
-        })
-        .checkAuthStatus();
-
       // Warm structural cache in background + get sheet metadata
       google.script.run
         .withSuccessHandler(function(meta) {

@@ -257,6 +257,7 @@
       gap: 8px;
       padding-top: 12px;
       border-top: 1px solid var(--border);
+      flex-wrap: wrap;
     }
 
     .input-area {
@@ -1026,6 +1027,7 @@
     .keyboard-hint {
       font-size: 9px; color: #999; padding: 2px 0 0;
       opacity: 0; transition: opacity 0.2s;
+      width: 100%;
     }
     .input-area:focus-within .keyboard-hint { opacity: 1; }
   </style>
@@ -1039,6 +1041,7 @@
         <h1>Crunchy Sheets</h1>
       </div>
       <div class="header-actions">
+        <button class="header-btn" onclick="toggleView()" title="Open in larger window" id="expandBtn">↗</button>
         <button class="header-btn" onclick="startNewChat()" title="New chat">+</button>
         <button class="header-btn" onclick="toggleSettings()" title="Settings">⚙</button>
       </div>
@@ -1088,6 +1091,7 @@
     var VERCEL_API_BASE = 'https://crunchy-sheets.vercel.app';
 
     // ─── State ──────────────────────────────────────────────────────────
+    var isDialogMode = (typeof isDialogMode !== 'undefined') ? isDialogMode : false;
     var selectedSkill = null;
     var pendingActions = null; // Actions awaiting user confirmation
     var conversationHistory = []; // [{role, content, fetchedRanges?}] for two-pass
@@ -1113,6 +1117,12 @@
 
       // Restore chat state if returning from expanded view
       restoreChatState();
+
+      // Dialog mode: flip expand button to back arrow
+      if (isDialogMode) {
+        var btn = document.getElementById('expandBtn');
+        if (btn) { btn.textContent = '\u2190'; btn.title = 'Back to sidebar'; }
+      }
     })();
 
     // ─── Chat ───────────────────────────────────────────────────────────
@@ -2660,6 +2670,23 @@
           }
         })
         .loadChatHistory();
+    }
+
+    // ─── View Toggle (sidebar ↔ dialog) ─────────────────────────────────
+    function toggleView() {
+      if (isDialogMode) {
+        saveChatState(function() {
+          google.script.run
+            .withSuccessHandler(function() { google.script.host.close(); })
+            .showSidebar();
+        });
+      } else {
+        saveChatState(function() {
+          google.script.run
+            .withSuccessHandler(function() { google.script.host.close(); })
+            .openExpandedView();
+        });
+      }
     }
 
     // ─── Command Palette ──────────────────────────────────────────────────

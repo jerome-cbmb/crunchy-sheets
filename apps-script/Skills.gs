@@ -19,6 +19,7 @@ var SKILLS = [
   {
     id: 'variance_analysis',
     name: 'Variance Analysis',
+    icon: '\ud83d\udcca',
     description: 'Compare actuals to budget/forecast. Highlights key variances with drill-down explanations.',
     modelTier: 'sonnet',
     category: 'analysis'
@@ -26,6 +27,7 @@ var SKILLS = [
   {
     id: 'cash_flow_forecast',
     name: 'Cash Flow Forecasting',
+    icon: '\ud83d\udcb0',
     description: '13-week (personal) or 12-month (business) cash flow projection with scenario toggles.',
     modelTier: 'opus',
     category: 'modeling'
@@ -33,13 +35,15 @@ var SKILLS = [
   {
     id: 'revenue_waterfall',
     name: 'Revenue Waterfall',
-    description: 'Beginning → new → expansion → churn → contraction → ending revenue bridge.',
+    icon: '\ud83d\udcc8',
+    description: 'Beginning \u2192 new \u2192 expansion \u2192 churn \u2192 contraction \u2192 ending revenue bridge.',
     modelTier: 'sonnet',
     category: 'analysis'
   },
   {
     id: 'expense_categorization',
     name: 'Expense Categorization',
+    icon: '\ud83c\udff7',
     description: 'Auto-categorize transactions into standard expense categories (COGS, OpEx, CapEx, etc.).',
     modelTier: 'sonnet',
     category: 'automation'
@@ -47,6 +51,7 @@ var SKILLS = [
   {
     id: 'unit_economics',
     name: 'Unit Economics',
+    icon: '\ud83d\udce6',
     description: 'CAC, LTV, payback period, gross margin per unit. For SaaS and e-commerce.',
     modelTier: 'opus',
     category: 'analysis'
@@ -54,6 +59,7 @@ var SKILLS = [
   {
     id: 'cohort_analysis',
     name: 'Cohort Analysis',
+    icon: '\ud83d\udcc5',
     description: 'Monthly cohort retention/revenue tables with roll-forward calculations.',
     modelTier: 'opus',
     category: 'analysis'
@@ -61,6 +67,7 @@ var SKILLS = [
   {
     id: 'scenario_modeling',
     name: 'Scenario Modeling',
+    icon: '\ud83d\udd04',
     description: 'Add base/optimistic/pessimistic scenarios with toggle switches and sensitivity tables.',
     modelTier: 'opus',
     category: 'modeling'
@@ -68,6 +75,7 @@ var SKILLS = [
   {
     id: 'kpi_dashboard',
     name: 'KPI Dashboard',
+    icon: '\ud83d\udcc9',
     description: 'Build a summary dashboard with SPARKLINE charts, conditional formatting, and key metrics.',
     modelTier: 'sonnet',
     category: 'reporting'
@@ -75,6 +83,7 @@ var SKILLS = [
   {
     id: 'investor_metrics',
     name: 'Investor Metrics',
+    icon: '\ud83c\udfe6',
     description: 'Board-ready metrics: MRR/ARR, burn rate, runway, Rule of 40, magic number.',
     modelTier: 'sonnet',
     category: 'reporting'
@@ -82,6 +91,7 @@ var SKILLS = [
   {
     id: 'budget_vs_actual',
     name: 'Budget vs Actual',
+    icon: '\ud83d\udccb',
     description: 'Side-by-side budget vs actual with variance %, conditional formatting, and commentary.',
     modelTier: 'sonnet',
     category: 'analysis'
@@ -89,13 +99,15 @@ var SKILLS = [
   {
     id: 'workbook_format',
     name: 'Format & Organize',
-    description: 'Full workbook housekeeping — formatting, alignment, cleanup, tab organization.',
+    icon: '\ud83e\uddf9',
+    description: 'Full workbook housekeeping \u2014 formatting, alignment, cleanup, tab organization.',
     modelTier: 'sonnet',
     category: 'automation'
   },
   {
     id: 'formula_xray',
     name: 'Formula X-Ray',
+    icon: '\ud83d\udd2c',
     description: 'Break down any formula into color-coded components with plain-English explanations.',
     modelTier: 'sonnet',
     category: 'analysis'
@@ -103,6 +115,7 @@ var SKILLS = [
   {
     id: 'prove_it',
     name: 'Prove It',
+    icon: '\u2705',
     description: 'Build an auditable proof tab tracing every claimed number back to source cells.',
     modelTier: 'opus',
     category: 'analysis'
@@ -110,6 +123,7 @@ var SKILLS = [
   {
     id: 'tab_audit',
     name: 'Tab Audit',
+    icon: '\ud83d\uddc2',
     description: 'Identify unused, orphan, and scratch tabs. Color-code by status.',
     modelTier: 'sonnet',
     category: 'automation'

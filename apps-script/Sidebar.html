@@ -352,6 +352,17 @@
       background: var(--accent-light);
     }
 
+    .palette-clear {
+      display: inline-block;
+      margin-left: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      opacity: 0.6;
+      vertical-align: middle;
+    }
+    .palette-clear:hover { opacity: 1; }
+
     .palette-overlay {
       display: none;
       position: fixed;
@@ -730,6 +741,12 @@
     .settings-title {
       font-weight: 500;
       font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .settings-explainer {
+      font-size: 11px;
+      color: var(--text-muted, #888);
       margin-bottom: 8px;
     }
 
@@ -1031,14 +1048,15 @@
   <!-- Settings panel (role selection) -->
   <div class="settings-panel" id="settingsPanel">
     <div class="settings-title">Your role with this workbook:</div>
-    <label class="settings-option"><input type="radio" name="userRole" value="builder" onchange="saveRoleSetting(this.value)"> <strong>Builder</strong> — I created or maintain this</label>
-    <label class="settings-option"><input type="radio" name="userRole" value="reviewer" onchange="saveRoleSetting(this.value)"> <strong>Reviewer</strong> — I'm reviewing or auditing</label>
-    <label class="settings-option"><input type="radio" name="userRole" value="inherited" onchange="saveRoleSetting(this.value)"> <strong>Inherited</strong> — I took over someone else's model</label>
-    <label class="settings-option"><input type="radio" name="userRole" value="exploring" onchange="saveRoleSetting(this.value)"> <strong>Exploring</strong> — Just looking around</label>
+    <div class="settings-explainer">This helps the AI tailor its analysis to your perspective.</div>
+    <label class="settings-option"><input type="radio" name="userRole" value="builder" onchange="saveRoleSetting(this.value)"> <strong>Builder</strong> — focuses on formula logic and model structure</label>
+    <label class="settings-option"><input type="radio" name="userRole" value="reviewer" onchange="saveRoleSetting(this.value)"> <strong>Reviewer</strong> — emphasizes audit trail and data integrity</label>
+    <label class="settings-option"><input type="radio" name="userRole" value="inherited" onchange="saveRoleSetting(this.value)"> <strong>Inherited</strong> — explains context and flags assumptions</label>
+    <label class="settings-option"><input type="radio" name="userRole" value="exploring" onchange="saveRoleSetting(this.value)"> <strong>Exploring</strong> — gives high-level summaries first</label>
   </div>
 
   <!-- Command Palette -->
-  <button class="palette-trigger" id="paletteTrigger" onclick="openPalette()">What do you want to do?</button>
+  <button class="palette-trigger" id="paletteTrigger" onclick="openPalette()">What do you want to do? &#x25BE;</button>
   <div class="palette-overlay" id="paletteOverlay" onclick="closePalette()">
     <div class="palette-dropdown" id="paletteDropdown" onclick="event.stopPropagation()">
       <div class="palette-search">
@@ -1052,7 +1070,7 @@
   <div class="chat-container">
     <div class="messages" id="messages">
       <div class="message system">
-        I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or pick a skill below.
+        I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or browse skills above.
       </div>
     </div>
 
@@ -1174,9 +1192,6 @@
       if (proveSlashMatch) {
         selectedSkill = 'prove_it';
         text = proveSlashMatch[1];
-        document.querySelectorAll('.skill-chip').forEach(function(c) {
-          c.classList.toggle('active', c.dataset.id === 'prove_it');
-        });
       }
 
       // /xray shortcut
@@ -1185,9 +1200,6 @@
         var cellRef = xrayMatch[1].trim();
         text = cellRef ? 'Explain the formula in ' + cellRef : 'Explain the most complex formula';
         selectedSkill = 'formula_xray';
-        document.querySelectorAll('.skill-chip').forEach(function(c) {
-          c.classList.toggle('active', c.dataset.id === 'formula_xray');
-        });
       }
 
       // /format shortcut
@@ -1198,9 +1210,6 @@
           ? 'Format this workbook: ' + instruction
           : 'Run a full housekeeping sweep on this workbook';
         selectedSkill = 'workbook_format';
-        document.querySelectorAll('.skill-chip').forEach(function(c) {
-          c.classList.toggle('active', c.dataset.id === 'workbook_format');
-        });
       }
 
       // /audit shortcut
@@ -1211,10 +1220,14 @@
           ? 'Audit tabs: ' + auditInstruction
           : 'Run a full tab audit on this workbook';
         selectedSkill = 'tab_audit';
-        document.querySelectorAll('.skill-chip').forEach(function(c) {
-          c.classList.toggle('active', c.dataset.id === 'tab_audit');
-        });
       }
+
+      // Capture skill for this request, then clear UI for next turn
+      var activeSkill = selectedSkill;
+      selectedSkill = null;
+      var trigger = document.getElementById('paletteTrigger');
+      trigger.innerHTML = 'What do you want to do? &#x25BE;';
+      trigger.classList.remove('has-skill');
 
       addMessage(displayText, 'user');
       showTypingIndicator();
@@ -1223,13 +1236,13 @@
 
       // Prepend skill hint if selected (prove_it doesn't need prefix — it's sent in body)
       var fullPrompt = text;
-      if (selectedSkill && selectedSkill !== 'prove_it') {
-        fullPrompt = '[skill:' + selectedSkill + '] ' + text;
+      if (activeSkill && activeSkill !== 'prove_it') {
+        fullPrompt = '[skill:' + activeSkill + '] ' + text;
       }
 
       // "Prove It" context injection
       var proveItRegex = /prove\s+it|show\s+(me\s+)?your\s+work|back\s+it\s+up|prove\s+(that|this|the\s+numbers)/i;
-      var isProveIt = selectedSkill === 'prove_it' || proveItRegex.test(text);
+      var isProveIt = activeSkill === 'prove_it' || proveItRegex.test(text);
       if (isProveIt) {
         var lastAssistantText = getLastAssistantText();
         if (lastAssistantText) {
@@ -1248,9 +1261,9 @@
       google.script.run
         .withSuccessHandler(function(payload) {
           if (payload.isStructuralPass) {
-            streamStructuralAnalysis(payload, fullPrompt);
+            streamStructuralAnalysis(payload, fullPrompt, activeSkill);
           } else {
-            streamAnalysis(payload);
+            streamAnalysis(payload, activeSkill);
           }
         })
         .withFailureHandler(function(err) {
@@ -1258,7 +1271,7 @@
           removeTypingIndicator();
           addMessage('⚠ Error preparing request: ' + err.message, 'system');
         })
-        .getStructuralPayload(fullPrompt, selectedSkill || null);
+        .getStructuralPayload(fullPrompt, activeSkill || null);
     }
 
     // ─── Streaming ───────────────────────────────────────────────────────
@@ -1331,7 +1344,7 @@
      * Stream analysis from Vercel endpoint.
      * Uses fetch() + ReadableStream for progressive rendering.
      */
-    async function streamAnalysis(payload) {
+    async function streamAnalysis(payload, activeSkill) {
       if (!payload) {
         setLoading(false);
         addMessage('⚠ Could not read workbook. Try closing and re-opening the sidebar.', 'system');
@@ -1356,7 +1369,7 @@
             spreadsheetId: payload.spreadsheetId,
             userEmail: payload.userEmail,
             userRole: payload.userRole,
-            skill: selectedSkill || undefined,
+            skill: activeSkill || undefined,
             crossRefGraph: payload.crossRefGraph || undefined
           })
         });
@@ -1366,7 +1379,7 @@
           throw new Error(response.status + ': ' + errText);
         }
 
-        setLoadingPhase(skillPhases[selectedSkill] || 'analyzing');
+        setLoadingPhase(skillPhases[activeSkill] || 'analyzing');
         msgDiv.innerHTML = '';
 
         var reader = response.body.getReader();
@@ -1384,7 +1397,7 @@
         // Stream complete
         setLoading(false);
         removeStreamingIndicator(msgDiv);
-        finalizeStreamedMessage(msgDiv, accumulated);
+        finalizeStreamedMessage(msgDiv, accumulated, activeSkill);
 
       } catch (err) {
         setLoading(false);
@@ -1400,7 +1413,7 @@
      * Stream analysis using the structural model (lightweight first pass).
      * If Claude returns a data_request, fetches targeted data and does Pass 2.
      */
-    async function streamStructuralAnalysis(payload, originalPrompt) {
+    async function streamStructuralAnalysis(payload, originalPrompt, activeSkill) {
       var msgDiv = createStreamingMessage();
       setLoadingPhase('connecting');
       msgDiv.innerHTML = '<span class="stream-placeholder">Connecting to AI...</span>';
@@ -1420,7 +1433,7 @@
             spreadsheetId: payload.spreadsheetId,
             userEmail: payload.userEmail,
             userRole: payload.userRole,
-            skill: selectedSkill || undefined,
+            skill: activeSkill || undefined,
             isStructuralPass: true,
             conversationHistory: conversationHistory.slice(-6)
           })
@@ -1431,7 +1444,7 @@
           throw new Error(response.status + ': ' + errText);
         }
 
-        setLoadingPhase(skillPhases[selectedSkill] || 'analyzing');
+        setLoadingPhase(skillPhases[activeSkill] || 'analyzing');
         msgDiv.innerHTML = '';
 
         var reader = response.body.getReader();
@@ -1460,9 +1473,9 @@
           msgDiv.remove();
           setLoadingPhase('reading');
           google.script.run
-            .withSuccessHandler(function(fullPayload) { streamAnalysis(fullPayload); })
+            .withSuccessHandler(function(fullPayload) { streamAnalysis(fullPayload, activeSkill); })
             .withFailureHandler(function(err) { setLoading(false); addMessage('⚠ Error: ' + err.message, 'system'); })
-            .getAnalyzePayload(originalPrompt, null, selectedSkill || null);
+            .getAnalyzePayload(originalPrompt, null, activeSkill || null);
           return;
         }
 
@@ -1470,7 +1483,7 @@
           // Direct answer — finalize
           setLoading(false);
           removeStreamingIndicator(msgDiv);
-          finalizeStreamedMessage(msgDiv, accumulated);
+          finalizeStreamedMessage(msgDiv, accumulated, activeSkill);
           // Append to conversation history
           conversationHistory.push({ role: 'user', content: originalPrompt });
           conversationHistory.push({ role: 'assistant', content: accumulated });
@@ -1498,7 +1511,7 @@
                   spreadsheetId: payload.spreadsheetId,
                   userEmail: payload.userEmail,
                   userRole: payload.userRole,
-                  skill: selectedSkill || undefined,
+                  skill: activeSkill || undefined,
                   isStructuralPass: true,
                   requestedData: fetchedData,
                   conversationHistory: conversationHistory.slice(-6)
@@ -1510,7 +1523,7 @@
                 throw new Error(response2.status + ': ' + errText2);
               }
 
-              setLoadingPhase(skillPhases[selectedSkill] || 'analyzing');
+              setLoadingPhase(skillPhases[activeSkill] || 'analyzing');
               msgDiv.innerHTML = '';
 
               var reader2 = response2.body.getReader();
@@ -1527,7 +1540,7 @@
 
               setLoading(false);
               removeStreamingIndicator(msgDiv);
-              finalizeStreamedMessage(msgDiv, accumulated2);
+              finalizeStreamedMessage(msgDiv, accumulated2, activeSkill);
 
               // Track fetched ranges in conversation history
               var fetchedRanges = dataRequest.ranges.map(function(r) { return r.sheet + '!' + r.range; });
@@ -1579,7 +1592,7 @@
     /**
      * Parse the completed streamed response for actions/xray.
      */
-    function finalizeStreamedMessage(msgDiv, fullText) {
+    function finalizeStreamedMessage(msgDiv, fullText, activeSkill) {
       // Store raw text for Prove It context injection
       msgDiv.dataset.rawText = fullText;
 
@@ -1608,7 +1621,7 @@
 
       // "Verify this answer" CTA for analysis-only responses (no actions, no xray)
       var hasActions = parsed.actions && parsed.actions.length > 0;
-      if (!hasActions && !parsed.formulaXray && selectedSkill !== 'prove_it') {
+      if (!hasActions && !parsed.formulaXray && activeSkill !== 'prove_it') {
         var cta = document.createElement('div');
         cta.className = 'prove-it-cta';
         cta.innerHTML = '<span class="prove-it-link" onclick="triggerProveIt()">Verify this answer \u2192</span>';
@@ -2747,13 +2760,17 @@
               item.dataset.id = skill.id;
               item.dataset.name = skill.name.toLowerCase();
               item.dataset.desc = (skill.description || '').toLowerCase();
+              var tierLabel = skill.modelTier === 'opus' ? 'Deep' : 'Fast';
+              var tierTitle = skill.modelTier === 'opus'
+                ? 'Uses deeper reasoning for complex analysis'
+                : 'Uses a faster AI model';
               item.innerHTML =
                 '<div class="palette-item-info">' +
-                  '<div class="palette-item-name">' + escapeHtml(skill.name) + '</div>' +
+                  '<div class="palette-item-name">' + (skill.icon ? skill.icon + ' ' : '') + escapeHtml(skill.name) + '</div>' +
                   '<div class="palette-item-desc">' + escapeHtml(skill.description || '') + '</div>' +
                 '</div>' +
-                '<span class="palette-model-tag ' + skill.modelTier + '">' + skill.modelTier + '</span>';
-              item.onclick = function() { selectPaletteSkill(skill.id, skill.name); };
+                '<span class="palette-model-tag ' + skill.modelTier + '" title="' + tierTitle + '">' + tierLabel + '</span>';
+              item.onclick = function() { selectPaletteSkill(skill.id, skill.name, skill.icon); };
               list.appendChild(item);
             });
           });
@@ -2827,7 +2844,7 @@
       });
     }
 
-    function selectPaletteSkill(skillId, skillName) {
+    function selectPaletteSkill(skillId, skillName, skillIcon) {
       var config = skillId ? PALETTE_SKILLS[skillId] : null;
       var trigger = document.getElementById('paletteTrigger');
 
@@ -2840,10 +2857,11 @@
       // Simple selection: set skill, close palette, focus textarea
       selectedSkill = skillId;
       if (skillId && skillName) {
-        trigger.textContent = skillName;
+        var iconPrefix = skillIcon ? skillIcon + ' ' : '';
+        trigger.innerHTML = iconPrefix + escapeHtml(skillName) + ' <span class="palette-clear" onclick="event.stopPropagation(); selectPaletteSkill(null, null);">\u2715</span>';
         trigger.classList.add('has-skill');
       } else {
-        trigger.textContent = 'What do you want to do?';
+        trigger.innerHTML = 'What do you want to do? &#x25BE;';
         trigger.classList.remove('has-skill');
       }
 
@@ -2974,8 +2992,7 @@
 
       // Update trigger
       var trigger = document.getElementById('paletteTrigger');
-      var skillName = trigger.textContent; // already set by guided form title
-      trigger.textContent = 'What do you want to do?';
+      trigger.innerHTML = 'What do you want to do? &#x25BE;';
       trigger.classList.remove('has-skill');
 
       closePalette();
@@ -3072,10 +3089,13 @@
      */
     function startNewChat() {
       var container = document.getElementById('messages');
-      container.innerHTML = '<div class="message system">I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or pick a skill below.</div>';
+      container.innerHTML = '<div class="message system">I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or browse skills above.</div>';
       conversationHistory = [];
       pendingActions = null;
       selectedSkill = null;
+      var trigger = document.getElementById('paletteTrigger');
+      trigger.innerHTML = 'What do you want to do? &#x25BE;';
+      trigger.classList.remove('has-skill');
       google.script.run.saveChatHistory('');
       showExamplePrompts();
     }

@@ -632,6 +632,339 @@ function invalidateStructuralCache() {
   CacheService.getDocumentCache().remove('structural_model');
 }
 
+// ─── Formula X-Ray Payload (BFS Reference Tracer) ─────────────────────────
+
+/**
+ * Build a targeted payload for Formula X-Ray.
+ * BFS traces all references from target cells (max 3 levels, 100 cells).
+ *
+ * @param {string} rangeNotation - e.g. "B14", "Sheet1!A1:B2", "$A$1"
+ * @return {Object} { targetCells[], tracedCells[], traceStats }
+ */
+function buildFormulaXrayPayload(rangeNotation) {
+  var parsed = _parseRangeNotation(rangeNotation);
+  if (parsed.error) return { error: parsed.error };
+  if (parsed.cells.length > 10) return { error: 'Too many cells (max 10)' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var targetCells = [];
+
+  for (var i = 0; i < parsed.cells.length; i++) {
+    var tc = parsed.cells[i];
+    var sheet = tc.sheet ? ss.getSheetByName(tc.sheet) : ss.getActiveSheet();
+    if (!sheet) {
+      targetCells.push({ ref: tc.ref, sheet: tc.sheet || '?', error: 'Sheet not found' });
+      continue;
+    }
+    try {
+      var range = sheet.getRange(tc.ref);
+      var formula = range.getFormula();
+      var value = _safeValue(range.getValue());
+      var fontColor = range.getFontColor();
+      var role = 'value';
+      if (fontColor === '#0000ff' || fontColor === '#0000FF' || fontColor === '#082fff' || fontColor === '#082FFF') {
+        role = 'input';
+      } else if (formula) {
+        role = 'formula';
+      }
+      var headerLabel = _getHeaderLabel(sheet, range.getColumn());
+      targetCells.push({
+        ref: tc.ref,
+        sheet: sheet.getName(),
+        formula: formula || null,
+        value: value,
+        role: role,
+        headerLabel: headerLabel
+      });
+    } catch (e) {
+      targetCells.push({ ref: tc.ref, sheet: sheet.getName(), error: e.message });
+    }
+  }
+
+  // BFS trace references from all target cells
+  var traceResult = _traceReferences(targetCells, ss);
+
+  return {
+    targetCells: targetCells,
+    tracedCells: traceResult.tracedCells,
+    traceStats: traceResult.stats
+  };
+}
+
+/**
+ * Parse a range notation string into individual cell references.
+ * Handles: Sheet1!A1:B2, 'My Sheet'!$A$1, A1, $A$1, A1:B10
+ *
+ * @param {string} notation
+ * @return {Object} { cells: [{sheet, ref}], error? }
+ */
+function _parseRangeNotation(notation) {
+  if (!notation || !notation.trim()) return { error: 'No range specified' };
+  notation = notation.trim();
+
+  var sheet = null;
+  var rangeStr = notation;
+
+  // Extract sheet name if present
+  var sheetMatch = notation.match(/^'((?:[^']|'')+)'!(.+)$/) || notation.match(/^([A-Za-z0-9_]+)!(.+)$/);
+  if (sheetMatch) {
+    sheet = sheetMatch[1].replace(/''/g, "'");
+    rangeStr = sheetMatch[2];
+  }
+
+  // Strip $ signs for parsing
+  var cleanRange = rangeStr.replace(/\$/g, '');
+
+  // Check if it's a range (A1:B2) or a single cell (A1)
+  var rangeMatch = cleanRange.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
+  if (rangeMatch) {
+    var startCol = _colNumber(rangeMatch[1].toUpperCase());
+    var startRow = parseInt(rangeMatch[2], 10);
+    var endCol = _colNumber(rangeMatch[3].toUpperCase());
+    var endRow = parseInt(rangeMatch[4], 10);
+
+    var cells = [];
+    for (var r = startRow; r <= endRow; r++) {
+      for (var c = startCol; c <= endCol; c++) {
+        cells.push({ sheet: sheet, ref: _colLetter(c) + r });
+      }
+    }
+    return { cells: cells };
+  }
+
+  // Single cell
+  var cellMatch = cleanRange.match(/^([A-Z]+)(\d+)$/i);
+  if (cellMatch) {
+    return { cells: [{ sheet: sheet, ref: cellMatch[1].toUpperCase() + cellMatch[2] }] };
+  }
+
+  return { error: 'Could not parse range: ' + notation };
+}
+
+/**
+ * Convert column letter(s) to number. A → 1, Z → 26, AA → 27.
+ */
+function _colNumber(letters) {
+  var num = 0;
+  for (var i = 0; i < letters.length; i++) {
+    num = num * 26 + (letters.charCodeAt(i) - 64);
+  }
+  return num;
+}
+
+/**
+ * Extract formula references (same-sheet + cross-sheet + INDIRECT detection).
+ *
+ * @param {string} formula
+ * @param {string} currentSheet
+ * @return {Array} [{ref, sheet, isIndirect?}]
+ */
+function _extractFormulaRefs(formula, currentSheet) {
+  if (!formula) return [];
+  var refs = [];
+
+  // Detect INDIRECT — can't resolve statically
+  var indirectRegex = /INDIRECT\s*\(([^)]*)\)/gi;
+  var indirectMatch;
+  while ((indirectMatch = indirectRegex.exec(formula)) !== null) {
+    refs.push({ ref: 'INDIRECT(' + indirectMatch[1] + ')', sheet: currentSheet, isIndirect: true });
+  }
+
+  // Cross-sheet references: 'Sheet Name'!A1:B5 or Sheet1!A1
+  var crossRefRegex = /'((?:[^']|'')+)'!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?|([A-Za-z0-9_]+)!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?/gi;
+  var match;
+  while ((match = crossRefRegex.exec(formula)) !== null) {
+    var refSheet = match[1] ? match[1].replace(/''/g, "'") : match[6];
+    var startRef = (match[2] || match[7]).toUpperCase() + (match[3] || match[8]);
+    var endRef = (match[4] || match[9]) ? (match[4] || match[9]).toUpperCase() + (match[5] || match[10]) : null;
+    if (endRef) {
+      refs.push({ ref: startRef + ':' + endRef, sheet: refSheet });
+    } else {
+      refs.push({ ref: startRef, sheet: refSheet });
+    }
+  }
+
+  // Same-sheet references: $A$1, A1:B10, A1 (not already captured as cross-sheet)
+  // Use a cleaned formula with cross-sheet refs removed to avoid double-counting
+  var cleaned = formula.replace(/'((?:[^']|'')+)'!\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?/gi, '');
+  cleaned = cleaned.replace(/[A-Za-z0-9_]+!\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?/gi, '');
+  // Also remove INDIRECT contents
+  cleaned = cleaned.replace(/INDIRECT\s*\([^)]*\)/gi, '');
+
+  var sameSheetRegex = /\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?/gi;
+  var sameMatch;
+  while ((sameMatch = sameSheetRegex.exec(cleaned)) !== null) {
+    // Skip if it looks like a function name (preceded by letters)
+    var beforeIdx = sameMatch.index - 1;
+    if (beforeIdx >= 0 && /[A-Za-z]/.test(cleaned[beforeIdx])) continue;
+
+    var ref = sameMatch[1].toUpperCase() + sameMatch[2];
+    if (sameMatch[3]) {
+      ref += ':' + sameMatch[3].toUpperCase() + sameMatch[4];
+    }
+    refs.push({ ref: ref, sheet: currentSheet });
+  }
+
+  return refs;
+}
+
+/**
+ * BFS trace from target cells, resolving references up to 3 levels deep or 100 cells.
+ *
+ * @param {Array} targetCells - [{ref, sheet, formula, ...}]
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @return {Object} { tracedCells: [...], stats: {depth, cellsTraced, truncated} }
+ */
+function _traceReferences(targetCells, ss) {
+  var MAX_DEPTH = 3;
+  var MAX_CELLS = 100;
+  var visited = {};
+  var tracedCells = [];
+  var queue = [];
+  var truncated = false;
+
+  // Seed BFS queue from target cells that have formulas
+  for (var i = 0; i < targetCells.length; i++) {
+    var tc = targetCells[i];
+    if (!tc.formula || tc.error) continue;
+    var refs = _extractFormulaRefs(tc.formula, tc.sheet);
+    for (var j = 0; j < refs.length; j++) {
+      var key = refs[j].sheet + '!' + refs[j].ref;
+      if (!visited[key]) {
+        visited[key] = true;
+        queue.push({ ref: refs[j].ref, sheet: refs[j].sheet, depth: 1, isIndirect: refs[j].isIndirect || false, parentRef: tc.sheet + '!' + tc.ref });
+      }
+    }
+  }
+
+  var maxDepthReached = 0;
+
+  while (queue.length > 0) {
+    if (tracedCells.length >= MAX_CELLS) {
+      truncated = true;
+      break;
+    }
+
+    var item = queue.shift();
+    if (item.depth > MAX_DEPTH) {
+      truncated = true;
+      continue;
+    }
+    if (item.depth > maxDepthReached) maxDepthReached = item.depth;
+
+    // INDIRECT nodes — can't resolve further
+    if (item.isIndirect) {
+      tracedCells.push({
+        ref: item.ref,
+        sheet: item.sheet,
+        depth: item.depth,
+        isIndirect: true,
+        parentRef: item.parentRef
+      });
+      continue;
+    }
+
+    // Handle range refs — expand to individual cells (but cap expansion)
+    var cellRefs = _expandRangeRef(item.ref);
+    if (cellRefs.length > 20) cellRefs = cellRefs.slice(0, 20); // cap per-range expansion
+
+    for (var c = 0; c < cellRefs.length; c++) {
+      var cellRef = cellRefs[c];
+      var cellKey = item.sheet + '!' + cellRef;
+      if (visited[cellKey]) continue;
+      visited[cellKey] = true;
+
+      if (tracedCells.length >= MAX_CELLS) { truncated = true; break; }
+
+      var sheet = ss.getSheetByName(item.sheet);
+      if (!sheet) {
+        tracedCells.push({ ref: cellRef, sheet: item.sheet, depth: item.depth, error: 'Sheet not found', parentRef: item.parentRef });
+        continue;
+      }
+
+      try {
+        var range = sheet.getRange(cellRef);
+        var formula = range.getFormula();
+        var value = _safeValue(range.getValue());
+        var headerLabel = _getHeaderLabel(sheet, range.getColumn());
+
+        tracedCells.push({
+          ref: cellRef,
+          sheet: item.sheet,
+          depth: item.depth,
+          formula: formula || null,
+          value: value,
+          headerLabel: headerLabel,
+          isStatic: !formula,
+          parentRef: item.parentRef
+        });
+
+        // If this cell has a formula, enqueue its references for next level
+        if (formula && item.depth < MAX_DEPTH) {
+          var childRefs = _extractFormulaRefs(formula, item.sheet);
+          for (var cr = 0; cr < childRefs.length; cr++) {
+            var childKey = childRefs[cr].sheet + '!' + childRefs[cr].ref;
+            if (!visited[childKey]) {
+              visited[childKey] = true;
+              queue.push({
+                ref: childRefs[cr].ref,
+                sheet: childRefs[cr].sheet,
+                depth: item.depth + 1,
+                isIndirect: childRefs[cr].isIndirect || false,
+                parentRef: item.sheet + '!' + cellRef
+              });
+            }
+          }
+        }
+      } catch (e) {
+        tracedCells.push({ ref: cellRef, sheet: item.sheet, depth: item.depth, error: e.message, parentRef: item.parentRef });
+      }
+    }
+  }
+
+  return {
+    tracedCells: tracedCells,
+    stats: {
+      depth: maxDepthReached,
+      cellsTraced: tracedCells.length,
+      truncated: truncated
+    }
+  };
+}
+
+/**
+ * Expand a range ref (A1:B3) into individual cell refs, or return single cell as-is.
+ */
+function _expandRangeRef(ref) {
+  var rangeMatch = ref.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
+  if (!rangeMatch) return [ref];
+
+  var startCol = _colNumber(rangeMatch[1].toUpperCase());
+  var startRow = parseInt(rangeMatch[2], 10);
+  var endCol = _colNumber(rangeMatch[3].toUpperCase());
+  var endRow = parseInt(rangeMatch[4], 10);
+
+  var cells = [];
+  for (var r = startRow; r <= endRow; r++) {
+    for (var c = startCol; c <= endCol; c++) {
+      cells.push(_colLetter(c) + r);
+    }
+  }
+  return cells;
+}
+
+/**
+ * Get the header label (row 1) for a given column.
+ */
+function _getHeaderLabel(sheet, col) {
+  try {
+    var val = sheet.getRange(1, col).getValue();
+    return val ? String(val) : '';
+  } catch (e) {
+    return '';
+  }
+}
+
 /**
  * Fetch specific range data for Pass 2 of two-pass architecture.
  * Takes array of {sheet, range} and returns cell data in the same

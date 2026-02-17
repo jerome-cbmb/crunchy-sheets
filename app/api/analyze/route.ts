@@ -44,10 +44,20 @@ export async function POST(req: NextRequest) {
   // 3. Route skill
   const skillContext = routeToSkill(body.prompt, body.skill);
 
-  // 4. Token guard
-  const contextStr = body.isStructuralPass
-    ? JSON.stringify(body.structuralModel || '') + JSON.stringify(body.requestedData || '') + JSON.stringify(body.conversationHistory || '')
-    : JSON.stringify(body.workbookState || '');
+  // 4. Image size guard
+  if (body.imageBase64 && body.imageBase64.length > 6_500_000) {
+    return new Response(
+      'Image too large. Please use an image under 4MB.',
+      { status: 413, headers: corsHeaders }
+    );
+  }
+
+  // 5. Token guard
+  const contextStr = body.isXrayPass
+    ? JSON.stringify(body.structuralModel || '') + JSON.stringify(body.xrayPayload || '')
+    : body.isStructuralPass
+      ? JSON.stringify(body.structuralModel || '') + JSON.stringify(body.requestedData || '') + JSON.stringify(body.conversationHistory || '')
+      : JSON.stringify(body.workbookState || '');
   const estimatedTokens = Math.ceil(contextStr.length / 4);
   if (estimatedTokens > 150000) {
     return new Response(
@@ -56,26 +66,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 5. Build user message
-  const userMessage = body.isStructuralPass
-    ? buildStructuralUserMessage(body.prompt, body.structuralModel, skillContext, body.userRole, body.requestedData, body.conversationHistory)
-    : buildUserMessage(body.prompt, JSON.stringify(body.workbookState), skillContext, body.userRole, body.crossRefGraph);
+  // 6. Build user message
+  const userMessage = body.isXrayPass
+    ? buildXrayUserMessage(body.prompt, body.structuralModel, body.xrayPayload, skillContext, body.userRole)
+    : body.isStructuralPass
+      ? buildStructuralUserMessage(body.prompt, body.structuralModel, skillContext, body.userRole, body.requestedData, body.conversationHistory)
+      : buildUserMessage(body.prompt, JSON.stringify(body.workbookState), skillContext, body.userRole, body.crossRefGraph);
 
-  // 6. Select model
+  // 7. Select model
   const modelId = skillContext.modelTier === 'opus'
     ? 'claude-opus-4-6'
     : 'claude-sonnet-4-5-20250929';
 
-  // 7. Build system prompt with fresh date
+  // 8. Build system prompt with fresh date
   const systemPrompt = buildSystemPrompt(new Date().toISOString().split('T')[0])
     + (skillContext.systemAddendum || '');
 
-  // 8. Stream
+  // 9. Build messages (multimodal if image attached)
+  const messages = body.imageBase64
+    ? [{ role: 'user' as const, content: [
+        { type: 'image' as const, image: body.imageBase64 },
+        { type: 'text' as const, text: userMessage },
+      ]}]
+    : [{ role: 'user' as const, content: userMessage }];
+
+  // 10. Stream
   const result = streamText({
     model: anthropic(modelId),
     maxTokens: skillContext.maxTokens,
     system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }],
+    messages,
     onFinish: async ({ usage }) => {
       await trackUsage(googleUser.sub, {
         tokensIn: usage.promptTokens,
@@ -117,6 +137,36 @@ function buildUserMessage(
     msg += `## Cross-Reference Graph\n\`\`\`json\n${JSON.stringify(crossRefGraph)}\n\`\`\`\n\n`;
   }
 
+  msg += `## User Request\n${prompt}`;
+
+  return msg;
+}
+
+function buildXrayUserMessage(
+  prompt: string,
+  structuralModel: any,
+  xrayPayload: any,
+  skill: SkillContext,
+  userRole?: string
+): string {
+  let msg = '';
+
+  if (userRole) {
+    const roleDescriptions: Record<string, string> = {
+      builder: 'The user built or maintains this model. Be direct and technical.',
+      reviewer: 'The user is reviewing or auditing this model. Focus on risks and flags.',
+      inherited: 'The user inherited this model from someone else. Help them understand it.',
+      exploring: 'The user is exploring this model. Be descriptive about structure and purpose.',
+    };
+    msg += `[User Role: ${userRole}] ${roleDescriptions[userRole] || ''}\n\n`;
+  }
+
+  if (skill.skillId) {
+    msg += `[Active Skill: ${skill.skillId}]\n${skill.instruction}\n\n`;
+  }
+
+  msg += `## Workbook Structure\n\`\`\`json\n${JSON.stringify(structuralModel)}\n\`\`\`\n\n`;
+  msg += `## Formula X-Ray Payload (BFS-traced reference chain)\n\`\`\`json\n${JSON.stringify(xrayPayload)}\n\`\`\`\n\n`;
   msg += `## User Request\n${prompt}`;
 
   return msg;

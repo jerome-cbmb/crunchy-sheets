@@ -141,11 +141,33 @@ RESPONSE FORMAT:
 Return the standard JSON with actions[] array. In your response text, briefly summarize what you changed and flag anything that needs the user's attention (e.g., "Sheet3 appears unused — I flagged it but didn't delete it").`,
   },
   {
+    id: 'explain_tab',
+    modelTier: 'sonnet',
+    maxTokens: 4096,
+    useFullContext: false,
+    keywords: /\/explain\s+(this\s+)?tab|what.*tab.*(for|about|doing)|purpose.*tab|describe.*tab|walk\s+me\s+through\s+(this\s+)?tab/i,
+    instruction: 'Explain the active tab in plain English: key inputs, calculations, outputs, and purpose.',
+    systemAddendum: `
+EXPLAIN TAB MODE — structured walkthrough of the active sheet.
+
+Provide a clear, concise explanation structured as:
+
+1. **Purpose** — What this tab does in one sentence
+2. **Inputs** — Blue-font cells (role: "input") that drive calculations. List key ones with their current values
+3. **Calculations** — Key formulas and what they compute. Reference specific cells
+4. **Outputs** — Summary rows, totals, or key results
+5. **Connections** — Cross-tab references (which other sheets feed into or consume from this tab)
+
+Keep it concise. A CFO should read this in 30 seconds.
+
+Return the standard JSON format with empty actions array and your explanation in the response field.`,
+  },
+  {
     id: 'formula_xray',
     modelTier: 'sonnet',
     maxTokens: 4096,
-    useFullContext: true,
-    keywords: /explain.*formula|formula.*explain|x-ray|xray|break.*down.*formula|#explain|explain.*cell|what.*does.*formula|what.*does.*this.*do|how.*does.*this.*work|what.*this.*cell|decode.*formula|walk\s+me\s+through/i,
+    useFullContext: false,
+    keywords: /explain.*formula|formula.*explain|x-ray|xray|break.*down.*formula|#explain|explain.*cell|what.*does.*formula|what.*does.*this.*do|how.*does.*this.*work|what.*this.*cell|decode.*formula|walk\s+me\s+through\s+(this\s+)?formula/i,
     instruction: 'Analyze the formula in the specified cell. If no cell is specified, pick the most complex formula on the active sheet. Return ONLY the formula_xray JSON — do NOT return the normal actions/response format.',
     systemAddendum: `
 FORMULA X-RAY MODE — this overrides the normal action format.
@@ -160,6 +182,7 @@ Return ONLY a JSON block with this exact structure:
   "raw_formula": "=SUMPRODUCT((Revenue!B2:B13)*(Assumptions!C2:C13))",
   "computed_value": 1250000,
   "summary": "Multiplies monthly revenue by growth rates and sums the result.",
+  "verified": true,
   "components": [
     {
       "fragment": "SUMPRODUCT(...)",
@@ -185,6 +208,18 @@ Return ONLY a JSON block with this exact structure:
 }
 \`\`\`
 
+MULTI-CELL: When analyzing a range of cells, return:
+\`\`\`json
+{
+  "type": "formula_xray",
+  "range_summary": "These cells calculate monthly revenue projections using growth rates from Assumptions.",
+  "cells": [
+    { "cell": "B14", "sheet": "Calculations", "raw_formula": "=...", "computed_value": 1250000, "summary": "...", "verified": true, "components": [...], "inputs": [...] },
+    { "cell": "C14", "sheet": "Calculations", "raw_formula": "=...", "computed_value": 1350000, "summary": "...", "verified": true, "components": [...], "inputs": [...] }
+  ]
+}
+\`\`\`
+
 Component roles (use exactly these strings):
 - "logic" — IF, IFS, SWITCH, AND, OR, NOT
 - "math" — SUM, AVERAGE, arithmetic operators
@@ -194,6 +229,10 @@ Component roles (use exactly these strings):
 - "text" — CONCATENATE, LEFT, RIGHT, MID, TEXT
 - "date" — DATE, EDATE, EOMONTH, YEAR, MONTH
 - "error_handling" — IFERROR, IFNA, ISERROR
+
+DEEP TRACING: You receive the complete reference chain from BFS tracing — use it to explain how formulas build from source data. Follow the chain from target cell through intermediate formulas down to static inputs.
+
+TIE-OUT VERIFICATION: Reconstruct the calculation from inputs. Set \`verified: true\` if the math ties out, \`verified: false\` + \`discrepancy: "..."\` if it doesn't. NEVER silently accept numbers that don't add up.
 
 Edge cases:
 - If the cell contains a static value (no formula): set raw_formula to null, components and inputs to empty arrays, summary to "Static value — no formula to analyze."

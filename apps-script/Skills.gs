@@ -131,6 +131,15 @@ var SKILLS = [
     modelTier: 'sonnet',
     category: 'automation',
     showInUI: true
+  },
+  {
+    id: 'explain_tab',
+    name: 'Explain This Tab',
+    icon: '\ud83d\udccb',
+    description: 'Walk through the active tab: inputs, calculations, outputs, and purpose.',
+    modelTier: 'sonnet',
+    category: 'analysis',
+    showInUI: true
   }
 ];
 

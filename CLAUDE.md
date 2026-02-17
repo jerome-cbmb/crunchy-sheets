@@ -26,23 +26,33 @@ User clicks "Apply All" → google.script.run.applyActions(actions)
 
 **Pass 2 (targeted):** Sidebar calls `fetchRangeData()` to read only the requested cells, then streams a second request with that data appended.
 
-**Full-context fallback:** Four skills (`workbook_format`, `prove_it`, `tab_audit`, `formula_xray`) always use full serialization via `getAnalyzePayload()`. The routing happens server-side in `getStructuralPayload()` based on a `fullContextSkills` map.
+**X-Ray hybrid path:** Formula X-Ray (`/xray B14`) uses a third path — `getFormulaXrayPayload()` returns structural model + BFS-traced reference chain (3 levels deep, 100 cells max). Single-pass streaming, no full serialization needed.
+
+**Full-context fallback:** Three skills (`workbook_format`, `prove_it`, `tab_audit`) always use full serialization via `getAnalyzePayload()`. The routing happens server-side in `getStructuralPayload()` based on a `fullContextSkills` map.
+
+**Image input:** Sidebar sends images (drag-and-drop or `+` button, 4MB max) as base64 data URIs directly to Vercel via `imageBase64` field. Bypasses Apps Script entirely. Vercel AI SDK wraps into multimodal content array.
 
 **Full serialization (RLM):** Still available for full-context skills. Active sheet gets full cell data, other sheets get headers + bookend rows (first 3 + last 3, capped at 8 columns). Adaptive budget: 120K token target with graceful degradation. Vercel keeps a 150K hard guard.
 
 ## Data Flow (happy path)
 
 1. First open: onboarding card asks user role (builder/reviewer/inherited/exploring) → saved to `UserProperties`
-2. User types in sidebar → `send()` calls `google.script.run.getStructuralPayload(prompt, skillHint)`
-3. `getStructuralPayload()` checks if the skill needs full context. If yes → falls back to `getAnalyzePayload()` (full serialization). If no → returns cached structural model (~2-5K tokens)
-4. Sidebar checks `payload.isStructuralPass`:
-   - **Structural path** → `streamStructuralAnalysis()`: streams from Vercel with structural model. If Claude returns `data_request`, calls `fetchRangeData()` for targeted data, then streams Pass 2
-   - **Full-context path** → `streamAnalysis()`: existing behavior with full workbook state
-5. `route.ts` verifies Google OAuth token, routes to skill, builds system prompt (includes two-pass protocol for structural requests), calls Claude via streaming API
-6. Claude streams JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` for X-Ray skill, or `type: "data_request"` for range requests)
-7. Sidebar renders response progressively as chunks arrive via `ReadableStream`
-8. On stream complete: action-parser extracts and validates JSON block. Formula X-Ray responses short-circuit with passthrough
-9. Assistant response rendered as markdown + actions preview panel. Formula X-Ray renders a color-coded breakdown card
+2. User types in sidebar → `send()` routes based on command:
+   - `/xray <cell>` → `getFormulaXrayPayload(cell)` → `streamXrayAnalysis()` (BFS-traced single-pass)
+   - `/xray` (bare) → structural path (Claude picks most complex formula)
+   - `/rescan` → `rescanStructuralCache()` (immediate, no AI call)
+   - `/explain` → `explain_tab` skill via structural path
+   - Other → `getStructuralPayload(prompt, skillHint)`
+3. `getStructuralPayload()` checks if the skill needs full context. If yes → falls back to `getAnalyzePayload()`. If no → returns cached structural model. Includes inline staleness check (verifies active sheet matches cache).
+4. Sidebar routes by payload type:
+   - **X-Ray path** (`isXrayPass`) → `streamXrayAnalysis()`: single-pass with structural model + BFS payload
+   - **Structural path** (`isStructuralPass`) → `streamStructuralAnalysis()`: two-pass with optional `data_request`
+   - **Full-context path** → `streamAnalysis()`: full workbook state
+5. Thinking steps show progress at each phase (reading → analyzing → fetching → verifying)
+6. `route.ts` verifies Google OAuth token, routes to skill, builds user message (3 builders: `buildXrayUserMessage`, `buildStructuralUserMessage`, `buildUserMessage`), supports multimodal images via content array
+7. Claude streams JSON with `actions[]`, `response`, `summary` (or `type: "formula_xray"` with optional `cells[]` for multi-cell, or `type: "data_request"` for range requests)
+8. On stream complete: action-parser extracts and validates JSON block. Formula X-Ray responses (single or multi-cell) short-circuit with passthrough
+9. Assistant response rendered as markdown + actions preview panel. Formula X-Ray renders color-coded breakdown card(s) with verification badges
 10. User clicks "Apply All" → `google.script.run.applyActions(actions)` (X-Ray is read-only, no actions)
 11. `ActionExecutor.gs:executeActions()` applies each action to the spreadsheet
 
@@ -118,9 +128,9 @@ Claude returns these in the `actions[]` array. ActionExecutor.gs applies them to
 
 Each action is independently try/caught — one failure doesn't stop the batch.
 
-## 14 Financial Skills
+## 15 Financial Skills
 
-Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt → slash command (`/xray`, `/format`, `/prove`, `/audit`) → keyword regex auto-detect → default (general analysis, Sonnet).
+Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt → slash command (`/xray`, `/format`, `/prove`, `/audit`, `/explain`, `/rescan`) → keyword regex auto-detect → default (general analysis, Sonnet).
 
 | Skill | Model | Category | Notes |
 |-------|-------|----------|-------|
@@ -135,22 +145,27 @@ Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt
 | Investor Metrics | Sonnet | reporting | |
 | Budget vs Actual | Sonnet | analysis | |
 | Format & Organize | Sonnet | automation | `/format` — full workbook housekeeping or targeted formatting. Uses `format_range`, `set_border`, `auto_resize_columns`, `set_tab_color`, `move_sheet`, `delete_sheet`, `add_note` |
-| Formula X-Ray | Sonnet | analysis | `/xray` — read-only; returns `formula_xray` JSON instead of actions |
+| Explain This Tab | Sonnet | analysis | `/explain` — structured walkthrough: purpose, inputs, calculations, outputs, connections |
+| Formula X-Ray | Sonnet | analysis | `/xray` — read-only; BFS-traced hybrid payload (no full serialization). Supports multi-cell ranges. Tie-out verification |
 | Prove It | Opus | analysis | `/prove` — builds auditable proof tab tracing numbers to source cells |
-| Tab Audit | Sonnet | automation | `/audit` — scans cross-ref graph to classify tabs as Connected/Isolated/Empty/Scratch. Color-codes flags with `set_tab_color`, `add_note`, `delete_sheet` |
+| Tab Audit | Sonnet | automation | `/audit` — scans cross-ref graph to classify tabs as Connected/Isolated/Empty/Scratch |
 
-Sonnet skills are fast/cheap. Opus skills require deeper reasoning. Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip }` — that bypasses action validation and renders as a color-coded card in the sidebar. Tab Audit uses a conditional `crossRefGraph` payload — `buildCrossRefGraph()` in WorkbookState.gs scans ALL sheets (including hidden) for cross-sheet formula refs + named range edges, only when `skillHint === 'tab_audit'`.
+Sonnet skills are fast/cheap. Opus skills require deeper reasoning. **explain_tab is defined BEFORE formula_xray in `SKILL_DEFINITIONS`** — keyword iteration is array-order, so "walk me through this tab" matches explain_tab first while "walk me through this formula" matches formula_xray.
+
+Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip, verified?, discrepancy? }` — that bypasses action validation and renders as a color-coded card. Multi-cell returns `{ type: "formula_xray", cells: [...], range_summary }`. Tab Audit uses `buildCrossRefGraph()` in WorkbookState.gs, only when `skillHint === 'tab_audit'`.
 
 ### Slash Commands
 
 | Command | Skill | Example |
 |---------|-------|---------|
-| `/xray [cell]` | formula_xray | `/xray B14` or bare `/xray` (picks most complex formula) |
+| `/xray [cell]` | formula_xray | `/xray B14` (BFS-traced) or bare `/xray` (structural path, picks most complex) |
 | `/format [instruction]` | workbook_format | `/format` (full sweep) or `/format just the header row` |
 | `/prove [text]` | prove_it | `/prove show your work` |
 | `/audit [instruction]` | tab_audit | `/audit` (full sweep) or `/audit just check hidden tabs` |
+| `/explain [focus]` | explain_tab | `/explain` (full tab) or `/explain revenue section` |
+| `/rescan` | — | Force-rebuild structural cache (no AI call) |
 
-Slash commands set `selectedSkill` explicitly, bypassing keyword regex matching. `/audit` also passes `skillHint` to `getAnalyzePayload()`, triggering `buildCrossRefGraph()` on the Apps Script side before the request reaches Vercel.
+Slash commands set `selectedSkill` explicitly, bypassing keyword regex matching. `/xray <cell>` routes to `getFormulaXrayPayload()` → `streamXrayAnalysis()` (single-pass). Bare `/xray` falls through to structural path. `/rescan` is handled entirely in `send()` with no AI call.
 
 ## Financial Formatting Conventions (non-negotiable)
 
@@ -253,10 +268,10 @@ RLS enabled on all tables, service role bypasses.
 
 ## Key Design Decisions
 
-- **Two-pass architecture:** Most requests use a lightweight structural model (~2-5K tokens) with targeted reads (~50ms/sheet vs ~2s for full reads). Claude answers directly from structure or requests specific ranges. Full serialization only for 4 skills that need complete cell data (format, prove_it, tab_audit, xray). Structural model cached in `DocumentCache` (6h TTL), invalidated on structural changes (add/remove/rename sheet) via `onWorkbookChange()` trigger.
+- **Three payload paths:** (1) Structural model (~2-5K tokens) for most requests — cached in `DocumentCache` (6h TTL), invalidated on structural changes + inline staleness check on active sheet. (2) X-Ray hybrid — structural model + BFS-traced reference chain via `buildFormulaXrayPayload()` (3 levels, 100 cells max). (3) Full serialization for 3 skills (format, prove_it, tab_audit). 120K token budget with graceful degradation, 150K hard guard.
 - **Streaming via Vercel:** Sidebar calls Vercel directly via `fetch()` + `ReadableStream`. Response renders progressively. Apps Script is bypassed for the AI call (only used for workbook serialization and action execution).
-- **Full serialization with adaptive budget:** For full-context skills: active sheet = full cell data, other sheets = headers + 3+3 bookend rows (capped at 8 cols). 120K token budget with graceful degradation. Vercel keeps a 150K hard guard.
-- **Phased loading states:** Send button shows contextual phases (Reading... → Connecting... → Analyzing...) with elapsed timer after 5s. Skill-specific labels (Building proof..., Formatting..., etc.).
+- **Thinking steps:** Progressive indicators show what's happening at each phase (reading → analyzing → fetching → verifying). Appear as pills in `#messages`, auto-dismissed via `clearThinkingSteps()`. Cache warmup step auto-dismisses on hit.
+- **Image input:** `+` button or drag-and-drop on input area. 4MB raw file limit (checked before base64 encoding). Sent as `imageBase64` in fetch body, Vercel wraps into multimodal content array. Bypasses Apps Script entirely.
 - **Compact chat history:** `saveChatState()` stores `{role, text}` JSON objects (~50-100 bytes each) instead of raw `outerHTML` (~2-4KB each). Backward-compatible — old HTML format is discarded on first restore.
 - **Slash command display:** User sees their original input (`/xray B14`) in chat, not the mutated API prompt.
 - **No email display:** Auth is verified server-side on every `/api/analyze` request. Email display removed from sidebar.

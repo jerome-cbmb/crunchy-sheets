@@ -87,6 +87,9 @@ export interface AnalyzeRequest {
   crossRefGraph?: any;
   structuralModel?: any;
   isStructuralPass?: boolean;
+  isXrayPass?: boolean;
+  xrayPayload?: any;
+  imageBase64?: string;
   conversationHistory?: ConversationEntry[];
   requestedData?: Record<string, any>;
 }
@@ -127,6 +130,19 @@ export interface FormulaXrayInput {
   value: any;
 }
 
+export interface FormulaXrayCellData {
+  cell: string;
+  sheet: string;
+  raw_formula: string | null;
+  computed_value: any;
+  summary: string;
+  components: FormulaXrayComponent[];
+  inputs: FormulaXrayInput[];
+  tip?: string;
+  verified?: boolean;
+  discrepancy?: string;
+}
+
 export interface FormulaXrayData {
   type: 'formula_xray';
   cell: string;
@@ -137,6 +153,10 @@ export interface FormulaXrayData {
   components: FormulaXrayComponent[];
   inputs: FormulaXrayInput[];
   tip?: string;
+  cells?: FormulaXrayCellData[];
+  range_summary?: string;
+  verified?: boolean;
+  discrepancy?: string;
 }
 
 export interface ParsedResponse {

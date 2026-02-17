@@ -274,14 +274,31 @@ function runHealthCheck() {
  * @return {Object} { sheetNames: string[], sheetCount: number, activeSheet: string }
  */
 function warmStructuralCache() {
+  var cache = CacheService.getDocumentCache();
+  var wasCached = !!cache.get('structural_model');
+  var t0 = Date.now();
   var model = getStructuralModelCached(); // builds + caches if not already cached
+  var buildTimeMs = Date.now() - t0;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheets = ss.getSheets();
   return {
     sheetNames: sheets.map(function(s) { return s.getName(); }),
     sheetCount: sheets.length,
-    activeSheet: ss.getActiveSheet().getName()
+    activeSheet: ss.getActiveSheet().getName(),
+    cached: wasCached,
+    buildTimeMs: buildTimeMs
   };
+}
+
+/**
+ * Force rescan: invalidate cache then warm it fresh.
+ * Called from /rescan slash command.
+ *
+ * @return {Object} Same shape as warmStructuralCache().
+ */
+function rescanStructuralCache() {
+  invalidateStructuralCache();
+  return warmStructuralCache();
 }
 
 /**
@@ -374,12 +391,20 @@ function getSelectedRange() {
  */
 function getStructuralPayload(userPrompt, skillHint) {
   // Skills that need full workbook context
-  var fullContextSkills = { workbook_format: true, prove_it: true, tab_audit: true, formula_xray: true };
+  var fullContextSkills = { workbook_format: true, prove_it: true, tab_audit: true };
   if (skillHint && fullContextSkills[skillHint]) {
     return getAnalyzePayload(userPrompt, null, skillHint);
   }
 
   var model = getStructuralModelCached();
+
+  // Inline staleness check — verify active sheet is current
+  var currentActive = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getName();
+  if (model.activeSheet !== currentActive) {
+    invalidateStructuralCache();
+    model = getStructuralModelCached();
+  }
+
   return {
     structuralModel: model,
     prompt: userPrompt,
@@ -388,6 +413,38 @@ function getStructuralPayload(userPrompt, skillHint) {
     userEmail: Session.getActiveUser().getEmail(),
     userRole: getUserRole() || undefined,
     isStructuralPass: true
+  };
+}
+
+/**
+ * Returns structural model + BFS-traced xray payload for Formula X-Ray.
+ * Used when /xray specifies a cell — the BFS tracer provides the full
+ * reference chain so Claude doesn't need full workbook serialization.
+ *
+ * @param {string} rangeNotation - e.g. "B14", "Sheet1!A1:B2"
+ * @return {Object} Payload with isXrayPass: true
+ */
+function getFormulaXrayPayload(rangeNotation) {
+  var model = getStructuralModelCached();
+
+  // Inline staleness check
+  var currentActive = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getName();
+  if (model.activeSheet !== currentActive) {
+    invalidateStructuralCache();
+    model = getStructuralModelCached();
+  }
+
+  var xrayPayload = buildFormulaXrayPayload(rangeNotation);
+
+  return {
+    structuralModel: model,
+    xrayPayload: xrayPayload,
+    isXrayPass: true,
+    prompt: '',
+    token: ScriptApp.getOAuthToken(),
+    spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+    userEmail: Session.getActiveUser().getEmail(),
+    userRole: getUserRole() || undefined
   };
 }
 

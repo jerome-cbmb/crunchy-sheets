@@ -34,11 +34,14 @@ export function parseClaudeResponse(claudeText: string): ParsedResponse {
     }
   }
 
-  // Formula X-Ray early return
+  // Formula X-Ray early return (single-cell or multi-cell)
   if (parsedJson && parsedJson.type === 'formula_xray') {
+    const response = parsedJson.cells && Array.isArray(parsedJson.cells)
+      ? parsedJson.range_summary || ''
+      : parsedJson.summary || '';
     return {
       actions: [],
-      response: parsedJson.summary || '',
+      response,
       rawText: claudeText,
       formulaXray: parsedJson as FormulaXrayData,
     };

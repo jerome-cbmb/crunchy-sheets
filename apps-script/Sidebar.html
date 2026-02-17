@@ -251,6 +251,154 @@
       padding: 0;
     }
 
+    /* ─── Thinking Steps ───────────────────────────────────── */
+    .thinking-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .thinking-step {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: var(--accent-light);
+      transition: opacity 0.3s;
+    }
+
+    .thinking-step .step-icon { font-size: 13px; }
+
+    .thinking-step .step-spinner {
+      width: 12px; height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .thinking-step.done {
+      color: #1e8e3e;
+      opacity: 0.7;
+    }
+
+    .thinking-step.done .step-check { color: #1e8e3e; }
+
+    /* ─── Image Attachment ──────────────────────────────────── */
+    .attach-btn {
+      background: none !important;
+      border: 1px solid var(--border) !important;
+      color: var(--text-secondary) !important;
+      padding: 6px 10px !important;
+      font-size: 16px !important;
+      line-height: 1 !important;
+      cursor: pointer;
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+
+    .attach-btn:hover {
+      background: var(--accent-light) !important;
+      color: var(--accent) !important;
+    }
+
+    .image-preview {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      background: var(--accent-light);
+      border-radius: var(--radius);
+      font-size: 11px;
+      color: var(--text-secondary);
+      width: 100%;
+    }
+
+    .image-preview img {
+      max-height: 60px;
+      max-width: 60px;
+      border-radius: 3px;
+      object-fit: cover;
+    }
+
+    .image-preview .remove-image {
+      margin-left: auto;
+      cursor: pointer;
+      color: #999;
+      font-size: 14px;
+    }
+
+    .image-preview .remove-image:hover { color: #d93025; }
+
+    .drop-zone-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 81, 50, 0.1);
+      border: 2px dashed var(--accent);
+      border-radius: var(--radius);
+      z-index: 10;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .drop-zone-overlay.visible { display: flex; }
+
+    /* ─── Edit Guard ───────────────────────────────────────── */
+    .edit-guard {
+      font-size: 10px;
+      color: #1e8e3e;
+      text-align: center;
+      padding: 4px 0;
+      opacity: 0.7;
+      width: 100%;
+    }
+
+    /* ─── X-Ray Verification Badges ────────────────────────── */
+    .xray-verified {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+      background: #e6f4ea;
+      color: #1e8e3e;
+    }
+
+    .xray-discrepancy {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      background: #fce8e6;
+      color: #d93025;
+      margin-top: 6px;
+    }
+
+    .xray-multi-wrapper { margin-top: 8px; }
+    .xray-multi-wrapper .xray-card { margin-bottom: 6px; }
+
+    .xray-indirect-warning {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #e37400;
+      padding: 2px 0;
+    }
+
     /* Input area */
     .input-area {
       display: flex;
@@ -1219,11 +1367,16 @@
       </div>
     </div>
 
-    <div class="input-area">
+    <div class="input-area" id="inputArea">
       <div class="slash-menu" id="slashMenu"></div>
+      <div class="drop-zone-overlay" id="dropOverlay">Drop image here</div>
+      <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageSelect(this)">
+      <button class="attach-btn" title="Attach image" onclick="document.getElementById('imageInput').click()">+</button>
       <textarea id="prompt" rows="2" placeholder="Ask a question or type / for commands..." onkeydown="handleKey(event)" oninput="handleSlashAutocomplete(this.value)"></textarea>
       <button id="sendBtn" onclick="send()">Send</button>
+      <div id="imagePreview" style="display:none"></div>
       <div class="keyboard-hint">Enter to send · Shift+Enter for new line</div>
+      <div class="edit-guard">Always asks before making changes</div>
       <div class="sidebar-footer"><a onclick="showFeedbackForm()">Send feedback</a> · v1.0</div>
     </div>
   </div>
@@ -1239,18 +1392,29 @@
     var pendingActions = null; // Actions awaiting user confirmation
     var conversationHistory = []; // [{role, content, fetchedRanges?}] for two-pass
     var cacheMeta = null; // { sheetNames: [], sheetCount: N, activeSheet: '' }
+    var pendingImage = null; // base64 data URI for image attachment
 
     // ─── Init ───────────────────────────────────────────────────────────
     (function init() {
       // Warm structural cache in background + get sheet metadata
+      var warmStep = null;
       google.script.run
         .withSuccessHandler(function(meta) {
           cacheMeta = meta;
+          if (!meta.cached && warmStep) {
+            completeThinkingStep(warmStep);
+            setTimeout(function() { clearThinkingSteps(); }, 2000);
+          } else {
+            clearThinkingSteps();
+          }
         })
         .withFailureHandler(function(err) {
           console.warn('[Cache] Warm failed:', err.message);
+          clearThinkingSteps();
         })
         .warmStructuralCache();
+      // Show thinking step only — it'll auto-dismiss if cache was warm
+      warmStep = addThinkingStep('\ud83d\udcda', 'Learning your workbook...');
 
       // Build Command Palette
       buildPalette();
@@ -1297,7 +1461,9 @@
       { cmd: '/xray', desc: 'Explain a formula', skill: 'formula_xray' },
       { cmd: '/format', desc: 'Format & organize workbook', skill: 'workbook_format' },
       { cmd: '/prove', desc: 'Build proof tab', skill: 'prove_it' },
-      { cmd: '/audit', desc: 'Audit tabs for unused sheets', skill: 'tab_audit' }
+      { cmd: '/audit', desc: 'Audit tabs for unused sheets', skill: 'tab_audit' },
+      { cmd: '/rescan', desc: 'Rescan workbook structure', skill: null },
+      { cmd: '/explain', desc: 'Explain the active tab', skill: 'explain_tab' }
     ];
     var slashActiveIndex = -1;
 
@@ -1340,6 +1506,36 @@
       if (!text) return;
       var displayText = text;
 
+      // /rescan slash command — immediate action, no AI call
+      var rescanMatch = text.match(/^\/rescan\b/i);
+      if (rescanMatch) {
+        input.value = '';
+        addMessage(displayText, 'user');
+        var rescanStep = addThinkingStep('\ud83d\udd04', 'Rescanning workbook...');
+        google.script.run
+          .withSuccessHandler(function(meta) {
+            cacheMeta = meta;
+            completeThinkingStep(rescanStep);
+            setTimeout(function() { clearThinkingSteps(); }, 2000);
+            addMessage('Workbook knowledge updated. Found ' + meta.sheetCount + ' sheets.', 'system');
+          })
+          .withFailureHandler(function(err) {
+            clearThinkingSteps();
+            addMessage('\u26a0 Rescan failed: ' + err.message, 'system');
+          })
+          .rescanStructuralCache();
+        return;
+      }
+
+      // /explain slash command
+      var explainMatch = text.match(/^\/explain\s*(.*)/i);
+      if (explainMatch) {
+        var explainFocus = explainMatch[1].trim();
+        var base = 'Walk me through the active tab: key inputs, calculations, outputs, and purpose.';
+        text = explainFocus ? base + ' Focus on: ' + explainFocus : base;
+        selectedSkill = 'explain_tab';
+      }
+
       // /prove slash command
       var proveSlashMatch = text.match(/^\/prove\s+(.*)/i);
       if (proveSlashMatch) {
@@ -1347,11 +1543,12 @@
         text = proveSlashMatch[1];
       }
 
-      // /xray shortcut
+      // /xray shortcut — capture cell BEFORE selectedSkill gets cleared
       var xrayMatch = text.match(/^\/xray\s*(.*)/i);
+      var xrayTargetCell = null;
       if (xrayMatch) {
-        var cellRef = xrayMatch[1].trim();
-        text = cellRef ? 'Explain the formula in ' + cellRef : 'Explain the most complex formula';
+        xrayTargetCell = xrayMatch[1].trim();
+        text = xrayTargetCell ? 'Explain the formula in ' + xrayTargetCell : 'Explain the most complex formula';
         selectedSkill = 'formula_xray';
       }
 
@@ -1382,10 +1579,17 @@
       trigger.innerHTML = 'What do you want to do? &#x25BE;';
       trigger.classList.remove('has-skill');
 
+      // Capture and clear pending image
+      var imageForThisRequest = pendingImage;
+      pendingImage = null;
+      var preview = document.getElementById('imagePreview');
+      if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
+
       addMessage(displayText, 'user');
       showTypingIndicator();
       input.value = '';
       setLoading(true, 'reading');
+      addThinkingStep('\ud83d\udcca', 'Reading workbook data...');
 
       // Prepend skill hint if selected (prove_it doesn't need prefix — it's sent in body)
       var fullPrompt = text;
@@ -1402,27 +1606,44 @@
           fullPrompt = '[Previous AI Response]\n' + lastAssistantText
             + '\n[/Previous AI Response]\n\n' + fullPrompt;
         } else {
-          // No previous message — short-circuit regardless of how Prove It was triggered
           setLoading(false);
+          clearThinkingSteps();
           removeTypingIndicator();
           addMessage('Nothing to verify yet — ask a question first, then say "prove it" to see the math.', 'assistant');
           return;
         }
       }
 
+      // X-Ray with specific cell → use BFS-traced xray payload (single-pass)
+      if (activeSkill === 'formula_xray' && xrayTargetCell) {
+        google.script.run
+          .withSuccessHandler(function(payload) {
+            streamXrayAnalysis(payload, fullPrompt, imageForThisRequest);
+          })
+          .withFailureHandler(function(err) {
+            setLoading(false);
+            clearThinkingSteps();
+            removeTypingIndicator();
+            addMessage('\u26a0 Error preparing x-ray: ' + err.message, 'system');
+          })
+          .getFormulaXrayPayload(xrayTargetCell);
+        return;
+      }
+
       // Step 1: Get payload from Apps Script (structural or full, based on skill)
       google.script.run
         .withSuccessHandler(function(payload) {
           if (payload.isStructuralPass) {
-            streamStructuralAnalysis(payload, fullPrompt, activeSkill);
+            streamStructuralAnalysis(payload, fullPrompt, activeSkill, imageForThisRequest);
           } else {
-            streamAnalysis(payload, activeSkill);
+            streamAnalysis(payload, activeSkill, imageForThisRequest);
           }
         })
         .withFailureHandler(function(err) {
           setLoading(false);
+          clearThinkingSteps();
           removeTypingIndicator();
-          addMessage('⚠ Error preparing request: ' + err.message, 'system');
+          addMessage('\u26a0 Error preparing request: ' + err.message, 'system');
         })
         .getStructuralPayload(fullPrompt, activeSkill || null);
     }
@@ -1497,34 +1718,42 @@
      * Stream analysis from Vercel endpoint.
      * Uses fetch() + ReadableStream for progressive rendering.
      */
-    async function streamAnalysis(payload, activeSkill) {
+    async function streamAnalysis(payload, activeSkill, imageBase64) {
       if (!payload) {
         setLoading(false);
-        addMessage('⚠ Could not read workbook. Try closing and re-opening the sidebar.', 'system');
+        clearThinkingSteps();
+        addMessage('\u26a0 Could not read workbook. Try closing and re-opening the sidebar.', 'system');
         return;
       }
       var msgDiv = createStreamingMessage();
+      var phaseLabel = { formula_xray: 'Analyzing formula...', prove_it: 'Building proof...',
+        workbook_format: 'Formatting...', tab_audit: 'Checking tabs...',
+        explain_tab: 'Understanding tab...' }[activeSkill] || 'Thinking...';
       setLoadingPhase('connecting');
-      msgDiv.innerHTML = '<span class="stream-placeholder">Connecting to AI...</span>';
+      addThinkingStep('\ud83e\udde0', phaseLabel);
+      msgDiv.innerHTML = '<span class="stream-placeholder">' + phaseLabel + '</span>';
 
-      var skillPhases = { prove_it: 'building_proof', workbook_format: 'formatting', tab_audit: 'auditing', formula_xray: 'xraying' };
+      var skillPhases = { prove_it: 'building_proof', workbook_format: 'formatting', tab_audit: 'auditing', formula_xray: 'xraying', explain_tab: 'analyzing' };
 
       try {
+        var fetchBody = {
+          workbookState: payload.workbookState,
+          prompt: payload.prompt,
+          spreadsheetId: payload.spreadsheetId,
+          userEmail: payload.userEmail,
+          userRole: payload.userRole,
+          skill: activeSkill || undefined,
+          crossRefGraph: payload.crossRefGraph || undefined
+        };
+        if (imageBase64) fetchBody.imageBase64 = imageBase64;
+
         var response = await fetch(VERCEL_API_BASE + '/api/analyze', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + payload.token
           },
-          body: JSON.stringify({
-            workbookState: payload.workbookState,
-            prompt: payload.prompt,
-            spreadsheetId: payload.spreadsheetId,
-            userEmail: payload.userEmail,
-            userRole: payload.userRole,
-            skill: activeSkill || undefined,
-            crossRefGraph: payload.crossRefGraph || undefined
-          })
+          body: JSON.stringify(fetchBody)
         });
 
         if (!response.ok) {
@@ -1549,14 +1778,16 @@
 
         // Stream complete
         setLoading(false);
+        clearThinkingSteps();
         removeStreamingIndicator(msgDiv);
         finalizeStreamedMessage(msgDiv, accumulated, activeSkill);
 
       } catch (err) {
         setLoading(false);
+        clearThinkingSteps();
         removeStreamingIndicator(msgDiv);
         if (msgDiv.parentNode) msgDiv.remove();
-        addMessage('⚠ ' + formatErrorMessage(err.message), 'system');
+        addMessage('\u26a0 ' + formatErrorMessage(err.message), 'system');
       }
     }
 
@@ -1566,30 +1797,37 @@
      * Stream analysis using the structural model (lightweight first pass).
      * If Claude returns a data_request, fetches targeted data and does Pass 2.
      */
-    async function streamStructuralAnalysis(payload, originalPrompt, activeSkill) {
+    async function streamStructuralAnalysis(payload, originalPrompt, activeSkill, imageBase64) {
       var msgDiv = createStreamingMessage();
+      var phaseLabel = { formula_xray: 'Analyzing formula...', prove_it: 'Building proof...',
+        workbook_format: 'Formatting...', tab_audit: 'Checking tabs...',
+        explain_tab: 'Understanding tab...' }[activeSkill] || 'Thinking...';
+      addThinkingStep('\ud83e\udde0', 'Analyzing structure...');
       setLoadingPhase('connecting');
-      msgDiv.innerHTML = '<span class="stream-placeholder">Connecting to AI...</span>';
+      msgDiv.innerHTML = '<span class="stream-placeholder">' + phaseLabel + '</span>';
 
-      var skillPhases = { prove_it: 'building_proof', workbook_format: 'formatting', tab_audit: 'auditing', formula_xray: 'xraying' };
+      var skillPhases = { prove_it: 'building_proof', workbook_format: 'formatting', tab_audit: 'auditing', formula_xray: 'xraying', explain_tab: 'analyzing' };
 
       try {
+        var fetchBody = {
+          structuralModel: payload.structuralModel,
+          prompt: payload.prompt,
+          spreadsheetId: payload.spreadsheetId,
+          userEmail: payload.userEmail,
+          userRole: payload.userRole,
+          skill: activeSkill || undefined,
+          isStructuralPass: true,
+          conversationHistory: conversationHistory.slice(-6)
+        };
+        if (imageBase64) fetchBody.imageBase64 = imageBase64;
+
         var response = await fetch(VERCEL_API_BASE + '/api/analyze', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + payload.token
           },
-          body: JSON.stringify({
-            structuralModel: payload.structuralModel,
-            prompt: payload.prompt,
-            spreadsheetId: payload.spreadsheetId,
-            userEmail: payload.userEmail,
-            userRole: payload.userRole,
-            skill: activeSkill || undefined,
-            isStructuralPass: true,
-            conversationHistory: conversationHistory.slice(-6)
-          })
+          body: JSON.stringify(fetchBody)
         });
 
         if (!response.ok) {
@@ -1627,7 +1865,7 @@
           setLoadingPhase('reading');
           google.script.run
             .withSuccessHandler(function(fullPayload) { streamAnalysis(fullPayload, activeSkill); })
-            .withFailureHandler(function(err) { setLoading(false); addMessage('⚠ Error: ' + err.message, 'system'); })
+            .withFailureHandler(function(err) { setLoading(false); clearThinkingSteps(); addMessage('\u26a0 Error: ' + err.message, 'system'); })
             .getAnalyzePayload(originalPrompt, null, activeSkill || null);
           return;
         }
@@ -1635,6 +1873,7 @@
         if (!dataRequest) {
           // Direct answer — finalize
           setLoading(false);
+          clearThinkingSteps();
           removeStreamingIndicator(msgDiv);
           finalizeStreamedMessage(msgDiv, accumulated, activeSkill);
           // Append to conversation history
@@ -1647,6 +1886,7 @@
         // Pass 2: fetch targeted data, then re-query
         setLoadingPhase('fetching');
         var rangeDesc = dataRequest.ranges.map(function(r) { return r.sheet + '!' + r.range; }).join(', ');
+        addThinkingStep('\ud83d\udce5', 'Fetching ' + escapeHtml(rangeDesc) + '...');
         msgDiv.innerHTML = '<span class="stream-placeholder">Fetching ' + escapeHtml(rangeDesc) + '...</span>';
 
         google.script.run
@@ -1692,6 +1932,7 @@
               }
 
               setLoading(false);
+              clearThinkingSteps();
               removeStreamingIndicator(msgDiv);
               finalizeStreamedMessage(msgDiv, accumulated2, activeSkill);
 
@@ -1703,24 +1944,27 @@
 
             } catch (err2) {
               setLoading(false);
+              clearThinkingSteps();
               removeStreamingIndicator(msgDiv);
               if (msgDiv.parentNode) msgDiv.remove();
-              addMessage('⚠ Error: ' + err2.message, 'system');
+              addMessage('\u26a0 Error: ' + err2.message, 'system');
             }
           })
           .withFailureHandler(function(err) {
             setLoading(false);
+            clearThinkingSteps();
             removeStreamingIndicator(msgDiv);
             if (msgDiv.parentNode) msgDiv.remove();
-            addMessage('⚠ Error fetching data: ' + err.message, 'system');
+            addMessage('\u26a0 Error fetching data: ' + err.message, 'system');
           })
           .fetchRangeData(dataRequest.ranges);
 
       } catch (err) {
         setLoading(false);
+        clearThinkingSteps();
         removeStreamingIndicator(msgDiv);
         if (msgDiv.parentNode) msgDiv.remove();
-        addMessage('⚠ ' + formatErrorMessage(err.message), 'system');
+        addMessage('\u26a0 ' + formatErrorMessage(err.message), 'system');
       }
     }
 
@@ -1741,6 +1985,175 @@
       }
       return null;
     }
+
+    // ─── X-Ray Streaming (single-pass, BFS-traced) ────────────────────
+
+    async function streamXrayAnalysis(payload, prompt, imageBase64) {
+      var msgDiv = createStreamingMessage();
+      addThinkingStep('\ud83d\udd0d', 'Tracing formula references...');
+      setLoadingPhase('xraying');
+      msgDiv.innerHTML = '<span class="stream-placeholder">Analyzing formula...</span>';
+
+      try {
+        var fetchBody = {
+          structuralModel: payload.structuralModel,
+          xrayPayload: payload.xrayPayload,
+          isXrayPass: true,
+          prompt: prompt,
+          spreadsheetId: payload.spreadsheetId,
+          userEmail: payload.userEmail,
+          userRole: payload.userRole,
+          skill: 'formula_xray'
+        };
+        if (imageBase64) fetchBody.imageBase64 = imageBase64;
+
+        var response = await fetch(VERCEL_API_BASE + '/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + payload.token
+          },
+          body: JSON.stringify(fetchBody)
+        });
+
+        if (!response.ok) {
+          var errText = await response.text();
+          throw new Error(response.status + ': ' + errText);
+        }
+
+        addThinkingStep('\u2705', 'Verifying math...');
+        msgDiv.innerHTML = '';
+
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var accumulated = '';
+
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          accumulated += decoder.decode(chunk.value, { stream: true });
+          updateStreamingMessage(msgDiv, accumulated);
+          scrollToBottom();
+        }
+
+        setLoading(false);
+        clearThinkingSteps();
+        removeStreamingIndicator(msgDiv);
+        finalizeStreamedMessage(msgDiv, accumulated, 'formula_xray');
+
+      } catch (err) {
+        setLoading(false);
+        clearThinkingSteps();
+        removeStreamingIndicator(msgDiv);
+        if (msgDiv.parentNode) msgDiv.remove();
+        addMessage('\u26a0 ' + formatErrorMessage(err.message), 'system');
+      }
+    }
+
+    // ─── Thinking Steps Helpers ──────────────────────────────────────
+
+    function addThinkingStep(icon, label) {
+      var container = document.getElementById('messages');
+      var stepsDiv = container.querySelector('.thinking-steps');
+      if (!stepsDiv) {
+        stepsDiv = document.createElement('div');
+        stepsDiv.className = 'thinking-steps';
+        container.appendChild(stepsDiv);
+      }
+      var step = document.createElement('div');
+      step.className = 'thinking-step';
+      step.innerHTML = '<span class="step-icon">' + icon + '</span>' +
+        '<span class="step-label">' + escapeHtml(label) + '</span>' +
+        '<span class="step-spinner"></span>';
+      stepsDiv.appendChild(step);
+      scrollToBottom();
+      return step;
+    }
+
+    function completeThinkingStep(stepEl) {
+      if (!stepEl) return;
+      stepEl.classList.add('done');
+      var spinner = stepEl.querySelector('.step-spinner');
+      if (spinner) {
+        spinner.outerHTML = '<span class="step-check">\u2713</span>';
+      }
+    }
+
+    function clearThinkingSteps() {
+      var container = document.getElementById('messages');
+      var stepsDiv = container.querySelector('.thinking-steps');
+      if (stepsDiv) stepsDiv.remove();
+    }
+
+    // ─── Image Attachment Handlers ───────────────────────────────────
+
+    function handleImageSelect(input) {
+      if (!input.files || !input.files[0]) return;
+      var file = input.files[0];
+      if (file.size > 4 * 1024 * 1024) {
+        addMessage('\u26a0 Image too large (max 4MB). Please use a smaller image.', 'system');
+        input.value = '';
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        pendingImage = e.target.result;
+        showImagePreview(pendingImage);
+      };
+      reader.readAsDataURL(file);
+      input.value = '';
+    }
+
+    function showImagePreview(dataUri) {
+      var preview = document.getElementById('imagePreview');
+      preview.style.display = 'flex';
+      preview.className = 'image-preview';
+      preview.innerHTML =
+        '<img src="' + dataUri + '" alt="Attached image">' +
+        '<span>Image attached</span>' +
+        '<span class="remove-image" onclick="removeImageAttachment()">\u2715</span>';
+    }
+
+    function removeImageAttachment() {
+      pendingImage = null;
+      var preview = document.getElementById('imagePreview');
+      preview.style.display = 'none';
+      preview.innerHTML = '';
+    }
+
+    // Drag-and-drop on input area
+    (function initDragDrop() {
+      var inputArea = document.getElementById('inputArea');
+      var overlay = document.getElementById('dropOverlay');
+      if (!inputArea || !overlay) return;
+
+      inputArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        overlay.classList.add('visible');
+      });
+      inputArea.addEventListener('dragleave', function(e) {
+        if (!inputArea.contains(e.relatedTarget)) {
+          overlay.classList.remove('visible');
+        }
+      });
+      inputArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        overlay.classList.remove('visible');
+        var files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('image/')) {
+          if (files[0].size > 4 * 1024 * 1024) {
+            addMessage('\u26a0 Image too large (max 4MB). Please use a smaller image.', 'system');
+            return;
+          }
+          var reader = new FileReader();
+          reader.onload = function(ev) {
+            pendingImage = ev.target.result;
+            showImagePreview(pendingImage);
+          };
+          reader.readAsDataURL(files[0]);
+        }
+      });
+    })();
 
     /**
      * Parse the completed streamed response for actions/xray.
@@ -2432,10 +2845,35 @@
      */
     function renderFormulaXray(xray) {
       var container = document.getElementById('messages');
+
+      // Multi-cell range response
+      if (xray.cells && xray.cells.length > 0) {
+        if (xray.range_summary) {
+          var summaryMsg = document.createElement('div');
+          summaryMsg.className = 'message assistant';
+          summaryMsg.innerHTML = renderMarkdown(escapeHtml(xray.range_summary));
+          container.appendChild(summaryMsg);
+        }
+        var wrapper = document.createElement('div');
+        wrapper.className = 'xray-multi-wrapper';
+        xray.cells.forEach(function(cellData) {
+          wrapper.appendChild(buildXrayCard(cellData));
+        });
+        container.appendChild(wrapper);
+        scrollToBottom();
+        return;
+      }
+
+      // Single cell
+      container.appendChild(buildXrayCard(xray));
+      scrollToBottom();
+    }
+
+    function buildXrayCard(xray) {
       var card = document.createElement('div');
       card.className = 'xray-card';
 
-      // Header: cell badge + computed value
+      // Header: cell badge + computed value + verification badge
       var header = document.createElement('div');
       header.className = 'xray-header';
       var cellRef = (xray.sheet || '') + '!' + (xray.cell || '?');
@@ -2443,7 +2881,18 @@
       if (xray.computed_value !== null && xray.computed_value !== undefined) {
         header.innerHTML += ' <span class="xray-computed">= ' + escapeHtml(String(xray.computed_value)) + '</span>';
       }
+      if (xray.verified === true) {
+        header.innerHTML += ' <span class="xray-verified">\u2713 Verified</span>';
+      }
       card.appendChild(header);
+
+      // Discrepancy banner
+      if (xray.verified === false && xray.discrepancy) {
+        var discDiv = document.createElement('div');
+        discDiv.className = 'xray-discrepancy';
+        discDiv.innerHTML = '\u26a0 ' + escapeHtml(xray.discrepancy);
+        card.appendChild(discDiv);
+      }
 
       // Formula bar
       if (xray.raw_formula) {
@@ -2493,6 +2942,14 @@
           var row = document.createElement('div');
           row.className = 'xray-input-row';
 
+          // INDIRECT warning
+          if (input.isIndirect) {
+            row.className = 'xray-indirect-warning';
+            row.innerHTML = '\u26a0 <span>' + escapeHtml(input.cell || 'INDIRECT') + '</span> <span>Cannot trace \u2014 dynamic reference</span>';
+            inputSection.appendChild(row);
+            return;
+          }
+
           var isCrossref = input.sheet && xray.sheet && input.sheet !== xray.sheet;
           var cellClass = isCrossref ? 'crossref' : 'local';
           var cellDisplay = input.sheet ? input.sheet + '!' + input.cell : input.cell;
@@ -2516,8 +2973,7 @@
         card.appendChild(tipDiv);
       }
 
-      container.appendChild(card);
-      scrollToBottom();
+      return card;
     }
 
     /**
@@ -2841,13 +3297,13 @@
         icon: '\ud83d\udd0d',
         desc: null,
         fields: [
-          { key: 'cell', label: 'Cell or range', type: 'range', placeholder: 'e.g. B14' },
+          { key: 'cell', label: 'Cell or range', type: 'range', placeholder: 'e.g. B14 or B14:C14' },
         ],
         hint: 'Leave blank \u2192 picks most complex formula',
         buttonLabel: 'Explain',
         buildPrompt: function(vals) {
           var cell = vals.cell ? vals.cell.trim() : '';
-          return cell ? 'Explain the formula in ' + cell : 'Explain the most complex formula on the active sheet';
+          return cell ? '/xray ' + cell : '/xray';
         }
       },
       workbook_format: {
@@ -2905,6 +3361,21 @@
           var ctx = vals.context ? vals.context.trim() : '';
           var base = cell ? 'Prove the number in ' + cell : 'Prove your last analysis';
           return ctx ? base + '. ' + ctx + '.' : base + '.';
+        }
+      },
+      explain_tab: {
+        title: 'Explain This Tab',
+        icon: '\ud83d\udccb',
+        desc: 'Plain-English explanation of the active tab.',
+        fields: [
+          { key: 'focus', label: 'Focus area (optional)', type: 'text', placeholder: 'e.g. revenue section, rows 10-25' }
+        ],
+        hint: 'Leave blank for full tab walkthrough',
+        buttonLabel: 'Explain',
+        buildPrompt: function(vals) {
+          var focus = vals.focus ? vals.focus.trim() : '';
+          var base = 'Walk me through the active tab: key inputs, calculations, outputs, and purpose.';
+          return focus ? base + ' Focus on: ' + focus : base;
         }
       }
     };

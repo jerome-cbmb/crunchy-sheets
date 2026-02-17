@@ -84,7 +84,7 @@
       background: var(--accent-light);
       border: 1px solid var(--border);
       font-size: 11px;
-      text-align: center;
+      text-align: left;
       max-width: 100%;
       color: var(--accent);
     }
@@ -1363,7 +1363,7 @@
   <div class="chat-container">
     <div class="messages" id="messages">
       <div class="message system">
-        I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or browse skills above.
+        Analyze financial models, explain formulas, build forecasts, and clean up formatting. Type a question or browse skills above.
       </div>
     </div>
 
@@ -3817,7 +3817,7 @@
      */
     function startNewChat() {
       var container = document.getElementById('messages');
-      container.innerHTML = '<div class="message system">I can analyze your financial model, explain formulas, build forecasts, and clean up formatting. Ask me anything about this workbook, or browse skills above.</div>';
+      container.innerHTML = '<div class="message system">Analyze financial models, explain formulas, build forecasts, and clean up formatting. Type a question or browse skills above.</div>';
       conversationHistory = [];
       pendingActions = null;
       selectedSkill = null;

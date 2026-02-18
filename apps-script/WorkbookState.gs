@@ -245,55 +245,109 @@ function _serializeSheetTruncated(sheet) {
  * @return {Object} Sheet summary state.
  */
 function _serializeSheetSummary(sheet) {
-  var dataRange = sheet.getDataRange();
-  var values = dataRange.getValues();
-  var formulas = dataRange.getFormulas();
-  var fontColors = dataRange.getFontColors();
-  var numRows = values.length;
-  var numCols = numRows > 0 ? values[0].length : 0;
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+
+  // Empty sheet — no API reads needed
+  if (lastRow === 0 || lastCol === 0) {
+    return {
+      name: sheet.getName(),
+      index: sheet.getIndex(),
+      isActive: false,
+      isSummary: true,
+      dimensions: { rows: sheet.getMaxRows(), cols: sheet.getMaxColumns() },
+      dataRange: { rows: 0, cols: 0 },
+      totalDataRows: 0,
+      type: 'empty',
+      frozenRows: sheet.getFrozenRows(),
+      frozenCols: sheet.getFrozenColumns(),
+      cells: [],
+      _tokenEstimate: 0
+    };
+  }
 
   // Cap columns: row labels (A) + enough data cols to see the pattern
   var MAX_SUMMARY_COLS = 8;
-  var cappedCols = Math.min(numCols, MAX_SUMMARY_COLS);
+  var cappedCols = Math.min(lastCol, MAX_SUMMARY_COLS);
 
-  // Determine which rows to include:
-  // Header rows (0-1), first 3 data rows, last 3 data rows
-  var headerCount = Math.min(2, numRows);
-  var dataStartRow = headerCount;
-  var totalDataRows = numRows - dataStartRow;
+  var headerCount = Math.min(2, lastRow);
+  var dataStartRow = headerCount; // 0-indexed offset for data rows
+  var totalDataRows = lastRow - headerCount;
 
-  var rowsToInclude = {};
+  var values, formulas, fontColors;
 
-  // Always include header rows
-  for (var h = 0; h < headerCount; h++) {
-    rowsToInclude[h] = true;
+  if (lastRow <= 8) {
+    // Small sheet — one read covers everything we need
+    var range = sheet.getRange(1, 1, lastRow, cappedCols);
+    values = range.getValues();
+    formulas = range.getFormulas();
+    fontColors = range.getFontColors();
+  } else {
+    // Large sheet — targeted reads for only the rows we need (~12 rows total)
+    // Header rows (1-2)
+    var hRange = sheet.getRange(1, 1, headerCount, cappedCols);
+    var hValues = hRange.getValues();
+    var hFormulas = hRange.getFormulas();
+    var hFontColors = hRange.getFontColors();
+
+    // First 3 data rows (row 3-5, 1-indexed)
+    var firstN = Math.min(3, totalDataRows);
+    var fValues = [], fFormulas = [], fFontColors = [];
+    if (firstN > 0) {
+      var fRange = sheet.getRange(headerCount + 1, 1, firstN, cappedCols);
+      fValues = fRange.getValues();
+      fFormulas = fRange.getFormulas();
+      fFontColors = fRange.getFontColors();
+    }
+
+    // Last 3 data rows — only if they don't overlap with first-3
+    var lastStartRow1 = Math.max(headerCount + firstN + 1, lastRow - 2); // 1-indexed
+    var lastN = lastRow - lastStartRow1 + 1;
+    var lValues = [], lFormulas = [], lFontColors = [];
+    if (lastN > 0) {
+      var lRange = sheet.getRange(lastStartRow1, 1, lastN, cappedCols);
+      lValues = lRange.getValues();
+      lFormulas = lRange.getFormulas();
+      lFontColors = lRange.getFontColors();
+    }
+
+    // Stitch into single arrays (values/formulas/fontColors indexed by included row)
+    values = hValues.concat(fValues).concat(lValues);
+    formulas = hFormulas.concat(fFormulas).concat(fFontColors.length ? fFormulas.slice(0, 0) : []);
+    fontColors = hFontColors.concat(fFontColors).concat(lFontColors);
+    // Fix: properly stitch formulas too
+    formulas = hFormulas.concat(fFormulas).concat(lFormulas);
   }
 
-  // First 3 data rows
-  var firstN = Math.min(3, totalDataRows);
-  for (var f = 0; f < firstN; f++) {
-    rowsToInclude[dataStartRow + f] = true;
-  }
-
-  // Last 3 data rows
-  var lastStart = Math.max(dataStartRow, numRows - 3);
-  for (var l = lastStart; l < numRows; l++) {
-    rowsToInclude[l] = true;
+  // Build the mapping from array index to actual 1-indexed row number
+  var rowMap = [];
+  if (lastRow <= 8) {
+    for (var ri = 0; ri < lastRow; ri++) rowMap.push(ri + 1);
+  } else {
+    // Headers
+    for (var hi = 0; hi < headerCount; hi++) rowMap.push(hi + 1);
+    // First 3 data rows
+    var firstN2 = Math.min(3, totalDataRows);
+    for (var fi = 0; fi < firstN2; fi++) rowMap.push(headerCount + 1 + fi);
+    // Last 3 data rows
+    var lastStartRow1b = Math.max(headerCount + firstN2 + 1, lastRow - 2);
+    var lastN2 = lastRow - lastStartRow1b + 1;
+    for (var li = 0; li < lastN2; li++) rowMap.push(lastStartRow1b + li);
   }
 
   // Build cells for included rows + capped columns only
   var cells = [];
-  for (var r = 0; r < numRows; r++) {
-    if (!rowsToInclude[r]) continue;
+  for (var r = 0; r < values.length; r++) {
+    var actualRow = rowMap[r];
     for (var c = 0; c < cappedCols; c++) {
       var val = values[r][c];
       var formula = formulas[r][c];
       if (val === '' && formula === '') continue;
 
       var cell = {
-        row: r + 1,
+        row: actualRow,
         col: c + 1,
-        ref: _colLetter(c + 1) + (r + 1)
+        ref: _colLetter(c + 1) + actualRow
       };
 
       if (formula) {
@@ -320,7 +374,7 @@ function _serializeSheetSummary(sheet) {
     isActive: false,
     isSummary: true,
     dimensions: { rows: sheet.getMaxRows(), cols: sheet.getMaxColumns() },
-    dataRange: { rows: numRows, cols: numCols },
+    dataRange: { rows: lastRow, cols: lastCol },
     totalDataRows: totalDataRows,
     type: _classifySheetType(sheet.getName(), values),
     frozenRows: sheet.getFrozenRows(),
@@ -416,6 +470,9 @@ function buildCrossRefGraph() {
   var crossRefRegex = /'((?:[^']|'')+)'!|([A-Za-z0-9_]+)!/g;
   var indirectRegex = /INDIRECT\s*\(/i;
 
+  // Cache flattened formulas per sheet so we only read once
+  var formulasBySheet = {};
+
   for (var i = 0; i < sheets.length; i++) {
     var sheet = sheets[i];
     var name = sheet.getName();
@@ -441,6 +498,7 @@ function buildCrossRefGraph() {
         if (formulas[r][c]) allFormulas += formulas[r][c] + '\n';
       }
     }
+    formulasBySheet[name] = allFormulas;
 
     var hasIndirect = indirectRegex.test(allFormulas);
 
@@ -465,25 +523,16 @@ function buildCrossRefGraph() {
     };
   }
 
-  // Add edges from named ranges
+  // Add edges from named ranges — use cached formulasBySheet (zero additional API calls)
   var namedRanges = ss.getNamedRanges();
   for (var n = 0; n < namedRanges.length; n++) {
     var nr = namedRanges[n];
     var nrName = nr.getName();
     var targetSheet = nr.getRange().getSheet().getName();
-    // For each sheet, check if its formulas contain this named range
     for (var s = 0; s < sheets.length; s++) {
       var sName = sheets[s].getName();
       if (sName === targetSheet) continue;
-      // Quick check: does any formula in this sheet reference the named range?
-      var sFormulas = sheets[s].getDataRange().getFormulas();
-      var sAll = '';
-      for (var sr = 0; sr < sFormulas.length; sr++) {
-        for (var sc = 0; sc < sFormulas[sr].length; sc++) {
-          if (sFormulas[sr][sc]) sAll += sFormulas[sr][sc] + '\n';
-        }
-      }
-      if (sAll.indexOf(nrName) !== -1) {
+      if (formulasBySheet[sName] && formulasBySheet[sName].indexOf(nrName) !== -1) {
         if (refs[sName].indexOf(targetSheet) === -1) {
           refs[sName].push(targetSheet);
         }

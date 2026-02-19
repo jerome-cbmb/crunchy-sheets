@@ -1346,9 +1346,104 @@
       width: 100%;
     }
     .input-area:focus-within .keyboard-hint { opacity: 1; }
+
+    /* ─── Onboarding overlay ─────────────────────────────── */
+    .onboarding-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: var(--bg-warm);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px 20px;
+      animation: onboardFadeIn 0.3s ease;
+    }
+    .onboard-screen { display: none; flex-direction: column; align-items: center; text-align: center; width: 100%; max-width: 320px; }
+    .onboard-screen.active { display: flex; }
+    .onboard-logo { font-size: 28px; margin-bottom: 4px; }
+    .onboard-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+    .onboard-tagline { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+    .onboard-bullets { text-align: left; font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 24px; }
+    .onboard-cta {
+      background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+      padding: 10px 28px; font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .onboard-cta:hover { opacity: 0.9; }
+    .onboard-skip { font-size: 11px; color: var(--text-secondary); margin-top: 12px; cursor: pointer; border: none; background: none; text-decoration: underline; }
+    .onboard-skip:hover { color: var(--text-primary); }
+
+    .onboard-subtitle { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 16px; }
+    .onboard-role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+    .onboard-role-card {
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 10px;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s; text-align: center;
+    }
+    .onboard-role-card:hover { border-color: var(--accent); background: var(--accent-light); }
+    .onboard-role-icon { font-size: 22px; margin-bottom: 4px; }
+    .onboard-role-label { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+    .onboard-role-desc { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+
+    .onboard-scan-title { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 16px; }
+    .onboard-thinking-step {
+      display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary);
+      opacity: 0; transform: translateY(8px);
+      animation: onboardStepIn 0.35s ease forwards;
+      margin-bottom: 8px;
+    }
+    .onboard-thinking-step .icon { font-size: 14px; }
+
+    @keyframes onboardFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes onboardStepIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
+
+  <!-- Onboarding overlay (3 screens) -->
+  <div class="onboarding-overlay" id="onboardingOverlay">
+    <!-- Screen 1: Welcome -->
+    <div class="onboard-screen active" id="onboardScreen1">
+      <div class="onboard-logo">&#x1F95C;</div>
+      <div class="onboard-title">Crunchy Sheets</div>
+      <div class="onboard-tagline">AI CFO for Google Sheets</div>
+      <div class="onboard-bullets">
+        &#x2713; Understands your workbook structure<br>
+        &#x2713; Explains formulas and spots errors<br>
+        &#x2713; Builds forecasts and cleans formatting
+      </div>
+      <button class="onboard-cta" onclick="onboardGoToStep2()">Get started</button>
+      <button class="onboard-skip" onclick="_onboardingComplete('exploring')">Skip setup</button>
+    </div>
+    <!-- Screen 2: Role picker -->
+    <div class="onboard-screen" id="onboardScreen2">
+      <div class="onboard-subtitle">How are you working with this workbook?</div>
+      <div class="onboard-role-grid">
+        <div class="onboard-role-card" onclick="onboardSelectRole('builder')">
+          <div class="onboard-role-icon">&#x1F6E0;&#xFE0F;</div>
+          <div class="onboard-role-label">Builder</div>
+          <div class="onboard-role-desc">I created this</div>
+        </div>
+        <div class="onboard-role-card" onclick="onboardSelectRole('reviewer')">
+          <div class="onboard-role-icon">&#x1F50D;</div>
+          <div class="onboard-role-label">Reviewer</div>
+          <div class="onboard-role-desc">Checking someone's work</div>
+        </div>
+        <div class="onboard-role-card" onclick="onboardSelectRole('inherited')">
+          <div class="onboard-role-icon">&#x1F4E6;</div>
+          <div class="onboard-role-label">Inherited</div>
+          <div class="onboard-role-desc">Handed to me</div>
+        </div>
+        <div class="onboard-role-card" onclick="onboardSelectRole('exploring')">
+          <div class="onboard-role-icon">&#x1F9ED;</div>
+          <div class="onboard-role-label">Exploring</div>
+          <div class="onboard-role-desc">Just looking around</div>
+        </div>
+      </div>
+    </div>
+    <!-- Screen 3: Auto-scan -->
+    <div class="onboard-screen" id="onboardScreen3">
+      <div class="onboard-scan-title">Getting to know your workbook...</div>
+      <div id="onboardThinkingSteps"></div>
+    </div>
+  </div>
 
   <div class="header">
     <div class="header-row">
@@ -1913,6 +2008,10 @@
           clearThinkingSteps();
           removeStreamingIndicator(msgDiv);
           finalizeStreamedMessage(msgDiv, accumulated, activeSkill);
+          if (window._showPromptsAfterResponse) {
+            window._showPromptsAfterResponse = false;
+            showExamplePrompts(true);
+          }
           // Append to conversation history
           conversationHistory.push({ role: 'user', content: originalPrompt });
           conversationHistory.push({ role: 'assistant', content: accumulated });
@@ -1972,6 +2071,10 @@
               clearThinkingSteps();
               removeStreamingIndicator(msgDiv);
               finalizeStreamedMessage(msgDiv, accumulated2, activeSkill);
+              if (window._showPromptsAfterResponse) {
+                window._showPromptsAfterResponse = false;
+                showExamplePrompts(true);
+              }
 
               // Track fetched ranges in conversation history
               var fetchedRanges = dataRequest.ranges.map(function(r) { return r.sheet + '!' + r.range; });
@@ -3828,27 +3931,94 @@
       google.script.run
         .withSuccessHandler(function(role) {
           if (!role) {
-            google.script.run.saveUserRole('exploring');
+            _showOnboardingOverlay();
+          } else {
+            var radios = document.querySelectorAll('input[name="userRole"]');
+            for (var i = 0; i < radios.length; i++) {
+              if (radios[i].value === role) radios[i].checked = true;
+            }
+            showExamplePrompts();
           }
-          // Pre-select the current role in settings panel
-          var radios = document.querySelectorAll('input[name="userRole"]');
-          var currentRole = role || 'exploring';
-          for (var i = 0; i < radios.length; i++) {
-            if (radios[i].value === currentRole) radios[i].checked = true;
-          }
-          // Show example prompts if no messages yet
-          showExamplePrompts();
         })
         .getUserRole();
+    }
+
+    function _showOnboardingOverlay() {
+      var overlay = document.getElementById('onboardingOverlay');
+      overlay.style.display = 'flex';
+    }
+
+    function onboardGoToStep2() {
+      document.getElementById('onboardScreen1').classList.remove('active');
+      document.getElementById('onboardScreen2').classList.add('active');
+    }
+
+    function onboardSelectRole(role) {
+      // Save role + pre-select settings radio
+      google.script.run.saveUserRole(role);
+      var radios = document.querySelectorAll('input[name="userRole"]');
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].value === role) radios[i].checked = true;
+      }
+      // Show Screen 3
+      document.getElementById('onboardScreen2').classList.remove('active');
+      document.getElementById('onboardScreen3').classList.add('active');
+      _runOnboardingScan();
+    }
+
+    function _runOnboardingScan() {
+      var container = document.getElementById('onboardThinkingSteps');
+      var steps = [
+        { icon: '\ud83d\udcca', text: 'Reading sheet structure...' },
+        { icon: '\ud83d\udd0d', text: 'Identifying formulas and patterns...' },
+        { icon: '\u2705', text: 'Ready to analyze!' }
+      ];
+      steps.forEach(function(step, i) {
+        setTimeout(function() {
+          var div = document.createElement('div');
+          div.className = 'onboard-thinking-step';
+          div.innerHTML = '<span class="icon">' + step.icon + '</span> ' + step.text;
+          container.appendChild(div);
+          // After last step, fire auto-scan
+          if (i === steps.length - 1) {
+            setTimeout(_fireAutoScan, 400);
+          }
+        }, i * 650);
+      });
+    }
+
+    function _fireAutoScan() {
+      _onboardingComplete(null);
+      setTimeout(function() {
+        selectedSkill = null;
+        window._showPromptsAfterResponse = true;
+        document.getElementById('prompt').value = "What's in this workbook? Give me a quick overview.";
+        send();
+      }, 200);
+    }
+
+    function _onboardingComplete(role) {
+      var overlay = document.getElementById('onboardingOverlay');
+      overlay.style.transition = 'opacity 0.3s ease';
+      overlay.style.opacity = '0';
+      setTimeout(function() { overlay.style.display = 'none'; }, 300);
+      if (role) {
+        google.script.run.saveUserRole(role);
+        var radios = document.querySelectorAll('input[name="userRole"]');
+        for (var i = 0; i < radios.length; i++) {
+          if (radios[i].value === role) radios[i].checked = true;
+        }
+        showExamplePrompts();
+      }
     }
 
     /**
      * Show example prompt cards in the chat area (disappear on first message).
      */
-    function showExamplePrompts() {
+    function showExamplePrompts(force) {
       var container = document.getElementById('messages');
-      // Don't show if there are already user/assistant messages
-      if (container.querySelectorAll('.message.user, .message.assistant').length > 0) return;
+      // Don't show if there are already user/assistant messages (unless forced)
+      if (!force && container.querySelectorAll('.message.user, .message.assistant').length > 0) return;
 
       var promptsDiv = document.createElement('div');
       promptsDiv.className = 'example-prompts';

@@ -443,6 +443,7 @@
     }
 
     .slash-item:hover, .slash-item.active { background: var(--accent-light); }
+    .slash-item mark { font-weight: bold; background: rgba(15, 81, 50, 0.15); color: inherit; padding: 0; }
 
     .slash-cmd { font-weight: 600; color: var(--accent); font-family: 'Roboto Mono', monospace; font-size: 11px; }
     .slash-desc { color: var(--text-secondary); font-size: 11px; }
@@ -1405,22 +1406,22 @@
     <div class="onboard-screen" id="onboardScreen2">
       <div class="onboard-subtitle">How are you working with this workbook?</div>
       <div class="onboard-role-grid">
-        <div class="onboard-role-card" onclick="onboardSelectRole('builder')">
+        <div class="onboard-role-card" onclick="onboardSelectRole('builder')" title="Focuses on formula logic and model structure">
           <div class="onboard-role-icon">&#x1F6E0;&#xFE0F;</div>
           <div class="onboard-role-label">Builder</div>
           <div class="onboard-role-desc">I created this</div>
         </div>
-        <div class="onboard-role-card" onclick="onboardSelectRole('reviewer')">
+        <div class="onboard-role-card" onclick="onboardSelectRole('reviewer')" title="Emphasizes audit trail and data integrity">
           <div class="onboard-role-icon">&#x1F50D;</div>
           <div class="onboard-role-label">Reviewer</div>
           <div class="onboard-role-desc">Checking someone's work</div>
         </div>
-        <div class="onboard-role-card" onclick="onboardSelectRole('inherited')">
+        <div class="onboard-role-card" onclick="onboardSelectRole('inherited')" title="Explains context and flags assumptions">
           <div class="onboard-role-icon">&#x1F4E6;</div>
           <div class="onboard-role-label">Inherited</div>
           <div class="onboard-role-desc">Handed to me</div>
         </div>
-        <div class="onboard-role-card" onclick="onboardSelectRole('exploring')">
+        <div class="onboard-role-card" onclick="onboardSelectRole('exploring')" title="Gives high-level summaries first">
           <div class="onboard-role-icon">&#x1F9ED;</div>
           <div class="onboard-role-label">Exploring</div>
           <div class="onboard-role-desc">Just looking around</div>
@@ -1591,7 +1592,9 @@
       matches.forEach(function(c, i) {
         var item = document.createElement('div');
         item.className = 'slash-item' + (i === 0 ? ' active' : '');
-        item.innerHTML = '<span class="slash-cmd">' + c.cmd + '</span> <span class="slash-desc">' + c.desc + '</span>';
+        var matchLen = q.length;
+        var highlighted = '<mark>' + c.cmd.substring(0, matchLen) + '</mark>' + c.cmd.substring(matchLen);
+        item.innerHTML = '<span class="slash-cmd">' + highlighted + '</span> <span class="slash-desc">' + c.desc + '</span>';
         item.onclick = function() { completeSlashCommand(c.cmd); };
         menu.appendChild(item);
       });

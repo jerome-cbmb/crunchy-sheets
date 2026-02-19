@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   const userMessage = body.isXrayPass
     ? buildXrayUserMessage(body.prompt, body.structuralModel, body.xrayPayload, skillContext, body.userRole)
     : body.isStructuralPass
-      ? buildStructuralUserMessage(body.prompt, body.structuralModel, skillContext, body.userRole, body.requestedData, body.conversationHistory)
+      ? buildStructuralUserMessage(body.prompt, body.structuralModel, skillContext, body.userRole, body.requestedData, body.conversationHistory, body.crossRefGraph)
       : buildUserMessage(body.prompt, JSON.stringify(body.workbookState), skillContext, body.userRole, body.crossRefGraph);
 
   // 7. Select model
@@ -178,7 +178,8 @@ function buildStructuralUserMessage(
   skill: SkillContext,
   userRole?: string,
   requestedData?: Record<string, any>,
-  conversationHistory?: ConversationEntry[]
+  conversationHistory?: ConversationEntry[],
+  crossRefGraph?: any
 ): string {
   let msg = '';
 
@@ -197,6 +198,10 @@ function buildStructuralUserMessage(
   }
 
   msg += `## Workbook Structure\n\`\`\`json\n${JSON.stringify(structuralModel)}\n\`\`\`\n\n`;
+
+  if (crossRefGraph) {
+    msg += `## Cross-Reference Graph\n\`\`\`json\n${JSON.stringify(crossRefGraph)}\n\`\`\`\n\n`;
+  }
 
   if (requestedData) {
     msg += `## Requested Cell Data\n\`\`\`json\n${JSON.stringify(requestedData)}\n\`\`\`\n\n`;

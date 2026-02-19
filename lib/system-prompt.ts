@@ -53,6 +53,9 @@ USER CONTEXT:
 
 ${buildActionInstructions()}
 
+CROSS-REFERENCE GRAPH:
+When a "Cross-Reference Graph" section is present, trust the \`refs\` (outbound) and \`inbound\` maps as authoritative — they are scanned from ALL formulas across ALL sheets, not just sample rows. Never claim a tab is unreferenced without checking \`inbound[tabName]\`. The structural model's \`dependencyGraph\` only samples row 3 and is less reliable for dependency questions.
+
 TWO-PASS DATA PROTOCOL:
 When you receive "Workbook Structure" (not full cell data), choose:
 

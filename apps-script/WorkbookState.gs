@@ -540,7 +540,42 @@ function buildCrossRefGraph() {
     }
   }
 
-  return { refs: refs, meta: meta };
+  // Pre-compute inbound references (inverse of outbound refs)
+  var inbound = {};
+  for (var sheetName in refs) {
+    if (!inbound[sheetName]) inbound[sheetName] = [];
+    for (var r = 0; r < refs[sheetName].length; r++) {
+      var target = refs[sheetName][r];
+      if (!inbound[target]) inbound[target] = [];
+      if (inbound[target].indexOf(sheetName) === -1) {
+        inbound[target].push(sheetName);
+      }
+    }
+  }
+
+  return { refs: refs, inbound: inbound, meta: meta };
+}
+
+/**
+ * Get cross-reference graph from cache, or build and cache it.
+ * Separate cache slot from structural model (different TTL, different size).
+ *
+ * @return {Object} { refs, inbound, meta }
+ */
+function getCrossRefGraphCached() {
+  var cache = CacheService.getDocumentCache();
+  var cached = cache.get('cross_ref_graph');
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+  var graph = buildCrossRefGraph();
+  var json = JSON.stringify(graph);
+  if (json.length < 50000) {
+    cache.put('cross_ref_graph', json, 3600); // 1h TTL
+  } else {
+    Logger.log('Cross-ref graph too large for cache (' + json.length + ' bytes). Rebuilding each call.');
+  }
+  return graph;
 }
 
 // ─── Structural Model (Two-Pass Architecture) ─────────────────────────────

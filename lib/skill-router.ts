@@ -264,7 +264,7 @@ CLASSIFICATION (4 categories):
 
 Note: A sheet can be both Scratch AND (Empty or Isolated). Scratch takes priority in classification.
 
-INBOUND REFS: Sheet X has inbound refs if ANY other sheet's refs[] array includes X.
+INBOUND REFS: Check the \`inbound\` map — \`inbound[sheetName]\` lists all sheets that reference it. Empty array or missing key = no inbound refs.
 OUTBOUND REFS: Sheet X has outbound refs if its own refs[] array is non-empty.
 
 HIDDEN SHEETS: Sheets with isHidden=true appear in the graph but NOT in the workbook state. Include them in the audit table with a "(hidden)" note.

@@ -352,16 +352,6 @@
 
     .drop-zone-overlay.visible { display: flex; }
 
-    /* ─── Edit Guard ───────────────────────────────────────── */
-    .edit-guard {
-      font-size: 10px;
-      color: #1e8e3e;
-      text-align: center;
-      padding: 4px 0;
-      opacity: 0.7;
-      width: 100%;
-    }
-
     /* ─── X-Ray Verification Badges ────────────────────────── */
     .xray-verified {
       display: inline-flex;
@@ -1494,8 +1484,7 @@
       <button id="sendBtn" onclick="send()">Send</button>
       <div id="imagePreview" style="display:none"></div>
       <div class="keyboard-hint">Enter to send · Shift+Enter for new line</div>
-      <div class="edit-guard">Always asks before making changes</div>
-      <div class="sidebar-footer"><a onclick="showFeedbackForm()">\ud83d\udcac Send feedback</a> · v1.0</div>
+      <div class="sidebar-footer"><a onclick="showFeedbackForm()"><b>Send feedback</b></a> · v1.0</div>
     </div>
   </div>
 
@@ -1831,7 +1820,7 @@
         // Remove everything from the open fence onward
         displayText = stripped.substring(0, stripped.indexOf('```json')).trim();
         var isXray = text.indexOf('"formula_xray"') !== -1;
-        var label = isXray ? 'Analyzing formula...' : 'Building changes...';
+        var label = isXray ? 'Analyzing formula...' : 'Preparing suggestions...';
         var indicator = '<div class="json-building"><span class="spinner small"></span> ' + label + '</div>';
         div.innerHTML = (displayText ? renderMarkdown(escapeHtml(displayText)) : '') + indicator;
       } else if (displayText) {

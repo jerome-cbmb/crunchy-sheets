@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   // 7. Select model
   const modelId = skillContext.modelTier === 'opus'
     ? 'claude-opus-4-6'
-    : 'claude-sonnet-4-5-20250929';
+    : 'claude-sonnet-4-6';
 
   // 8. Build system prompt with fresh date
   const systemPrompt = buildSystemPrompt(new Date().toISOString().split('T')[0])

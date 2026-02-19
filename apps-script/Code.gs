@@ -189,10 +189,7 @@ function getAnalyzePayload(userPrompt, activeSheetOverride, skillHint) {
   var token = ScriptApp.getOAuthToken();
   var userRole = getUserRole();
 
-  var crossRefGraph = null;
-  if (skillHint === 'tab_audit') {
-    crossRefGraph = buildCrossRefGraph();
-  }
+  var crossRefGraph = getCrossRefGraphCached();
 
   return {
     workbookState: state,
@@ -404,6 +401,7 @@ function getStructuralPayload(userPrompt, skillHint) {
 
   return {
     structuralModel: model,
+    crossRefGraph: getCrossRefGraphCached(),
     prompt: userPrompt,
     token: ScriptApp.getOAuthToken(),
     spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),

@@ -619,6 +619,18 @@ function buildStructuralModel() {
       }
       model.keyFormulas = formulas;
 
+      // Row index for active sheet — gives Claude a "table of contents" for image matching
+      if (isActive) {
+        var colA = sheet.getRange(1, 1, lastRow, 1).getValues();
+        var rowIndex = [];
+        for (var ri = 0; ri < colA.length; ri++) {
+          if (colA[ri][0] !== '') {
+            rowIndex.push({ row: ri + 1, label: String(colA[ri][0]) });
+          }
+        }
+        model.rowIndex = rowIndex;
+      }
+
       // Build dependency graph from key formulas
       var deps = {};
       for (var f = 0; f < formulas.length; f++) {

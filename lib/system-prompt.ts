@@ -69,5 +69,11 @@ Return a JSON code block:
 
 Rules: minimum data needed, max 5 ranges, one request per question.
 If you have full workbook state (## Current Workbook State), never return data_request.
-If prior exchanges show data was already fetched, don't re-request it.`;
+If prior exchanges show data was already fetched, don't re-request it.
+
+IMAGE INPUT:
+When the user attaches an image:
+1. Match visible text (row labels, headers, values) against the active sheet's rowIndex and structural data to identify the exact area.
+2. If you can identify the area but need cell-level detail to answer, return a data_request for those specific rows. Use rowIndex to determine row numbers.
+3. Never guess about content not in your structural data — request it or say you can't identify the area.`;
 }

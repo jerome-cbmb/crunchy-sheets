@@ -1618,6 +1618,12 @@
       if (activeSkill === 'formula_xray' && xrayTargetCell) {
         google.script.run
           .withSuccessHandler(function(payload) {
+            // Complete the "Reading workbook data..." step
+            var stepsDiv = document.getElementById('messages').querySelector('.thinking-steps');
+            if (stepsDiv) {
+              var lastStep = stepsDiv.querySelector('.thinking-step:last-child');
+              if (lastStep) completeThinkingStep(lastStep);
+            }
             streamXrayAnalysis(payload, fullPrompt, imageForThisRequest);
           })
           .withFailureHandler(function(err) {
@@ -1633,6 +1639,12 @@
       // Step 1: Get payload from Apps Script (structural or full, based on skill)
       google.script.run
         .withSuccessHandler(function(payload) {
+          // Complete the "Reading workbook data..." step
+          var stepsDiv = document.getElementById('messages').querySelector('.thinking-steps');
+          if (stepsDiv) {
+            var lastStep = stepsDiv.querySelector('.thinking-step:last-child');
+            if (lastStep) completeThinkingStep(lastStep);
+          }
           if (payload.isStructuralPass) {
             streamStructuralAnalysis(payload, fullPrompt, activeSkill, imageForThisRequest);
           } else {
@@ -1690,6 +1702,8 @@
      * Update a streaming message div with accumulated text (progressive markdown).
      */
     function updateStreamingMessage(div, text) {
+      // Once we have real streamed content, dismiss thinking-step pills
+      clearThinkingSteps();
       // Strip completed JSON code blocks first, then check for open ones
       var stripped = text.replace(/```json[\s\S]*?```/g, '');
       var displayText = stripped.trim();

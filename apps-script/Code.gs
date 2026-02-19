@@ -20,9 +20,6 @@ function onOpen(e) {
   SpreadsheetApp.getUi()
     .createAddonMenu()
     .addItem('Open', 'showSidebar')
-    .addSeparator()
-    .addItem('Health Check', 'runHealthCheck')
-    .addItem('About', 'showAbout')
     .addToUi();
 }
 

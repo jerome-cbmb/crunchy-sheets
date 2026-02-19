@@ -76,7 +76,7 @@ crunchy-sheets/
 ├── apps-script/                  # Google Apps Script add-on (deployed via clasp)
 │   ├── Code.gs                   # Menu, sidebar launcher, getAnalyzePayload(), getStructuralPayload(), applyActions(), openExpandedView(), onWorkbookChange() trigger, user role persistence
 │   ├── Sidebar.html              # Chat UI, two-pass streaming (streamAnalysis + streamStructuralAnalysis), markdown rendering, skill chips, action preview/apply, formula x-ray card, phased loading states, compact chat history, onboarding, window toggle, /xray /format /prove /audit slash commands
-│   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core) with adaptive token budget, buildStructuralModel() + cache, fetchRangeData(), buildCrossRefGraph() for tab audit
+│   ├── WorkbookState.gs          # Workbook → JSON serializer (RLM core) with adaptive token budget, buildStructuralModel() + cache, fetchRangeData(), buildCrossRefGraph() + getCrossRefGraphCached()
 │   ├── ActionExecutor.gs         # Applies CellAction[] to the spreadsheet
 │   ├── OAuth.gs                  # getAuthToken(), checkAuthStatus(), registerUser()
 │   ├── Skills.gs                 # 14 financial skills registry (sidebar dropdown source)
@@ -152,7 +152,7 @@ Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt
 
 Sonnet skills are fast/cheap. Opus skills require deeper reasoning. **explain_tab is defined BEFORE formula_xray in `SKILL_DEFINITIONS`** — keyword iteration is array-order, so "walk me through this tab" matches explain_tab first while "walk me through this formula" matches formula_xray.
 
-Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip, verified?, discrepancy? }` — that bypasses action validation and renders as a color-coded card. Multi-cell returns `{ type: "formula_xray", cells: [...], range_summary }`. Tab Audit uses `buildCrossRefGraph()` in WorkbookState.gs, only when `skillHint === 'tab_audit'`.
+Formula X-Ray uses a different response shape — `{ type: "formula_xray", cell, sheet, raw_formula, components[], inputs[], tip, verified?, discrepancy? }` — that bypasses action validation and renders as a color-coded card. Multi-cell returns `{ type: "formula_xray", cells: [...], range_summary }`. Cross-ref graph (`getCrossRefGraphCached()`) is included on ALL paths (structural + full-context) with pre-computed `inbound` map. Cached separately (1h TTL, 50KB guard).
 
 ### Slash Commands
 

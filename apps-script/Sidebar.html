@@ -809,15 +809,15 @@
 
     /* ─── Feedback ────────────────────────────────────────── */
     .sidebar-footer {
-      font-size: 10px;
+      font-size: 11px;
       color: var(--text-secondary);
       text-align: center;
       padding: 4px 0 2px;
     }
 
     .sidebar-footer a {
-      color: var(--text-secondary);
-      text-decoration: none;
+      color: #888;
+      text-decoration: underline;
       cursor: pointer;
     }
 
@@ -951,11 +951,34 @@
       color: #5f6368;
       transition: all 0.15s;
       line-height: 1;
+      position: relative;
     }
 
     .header-btn:hover {
       border-color: var(--accent);
       color: var(--accent);
+    }
+
+    .header-btn::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      z-index: 100;
+    }
+
+    .header-btn:hover::after {
+      opacity: 1;
     }
 
     /* ─── Markdown rendering in assistant messages ────────── */
@@ -1334,9 +1357,9 @@
         <h1>Crunchy Sheets</h1>
       </div>
       <div class="header-actions">
-        <button class="header-btn" onclick="toggleView()" title="Open in larger window" id="expandBtn">↗</button>
-        <button class="header-btn" onclick="startNewChat()" title="New chat">+</button>
-        <button class="header-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+        <button class="header-btn" onclick="toggleView()" title="Open in larger window" data-tooltip="Expand" id="expandBtn">↗</button>
+        <button class="header-btn" onclick="startNewChat()" title="New chat" data-tooltip="New chat">+</button>
+        <button class="header-btn" onclick="toggleSettings()" title="Settings" data-tooltip="Settings">⚙</button>
       </div>
     </div>
   </div>
@@ -1377,7 +1400,7 @@
       <div id="imagePreview" style="display:none"></div>
       <div class="keyboard-hint">Enter to send · Shift+Enter for new line</div>
       <div class="edit-guard">Always asks before making changes</div>
-      <div class="sidebar-footer"><a onclick="showFeedbackForm()">Send feedback</a> · v1.0</div>
+      <div class="sidebar-footer"><a onclick="showFeedbackForm()">\ud83d\udcac Send feedback</a> · v1.0</div>
     </div>
   </div>
 
@@ -3307,8 +3330,8 @@
     // ─── Guided Form Configs (for inline chat cards) ──────────────────────
     var GUIDED_FORMS = {
       formula_xray: {
-        title: 'Explain a Formula',
-        icon: '\ud83d\udd0d',
+        title: 'Formula X-Ray',
+        icon: '\ud83d\udd2c',
         desc: null,
         fields: [
           { key: 'cell', label: 'Cell or range', type: 'range', placeholder: 'e.g. B14 or B14:C14' },
@@ -3320,9 +3343,72 @@
           return cell ? '/xray ' + cell : '/xray';
         }
       },
+      prove_it: {
+        title: 'Prove It',
+        icon: '\u2705',
+        desc: 'Creates a new "Proof" tab that traces every number back to its source cells and formulas \u2014 a dynamic audit trail.',
+        fields: [
+          { key: 'cell', label: 'Which cell or claim?', type: 'range', placeholder: 'e.g. D15' },
+          { key: 'context', label: 'What are you checking? (optional)', type: 'text', placeholder: 'e.g. total revenue looks high' }
+        ],
+        hint: 'Leave blank \u2192 proves last result',
+        buttonLabel: 'Prove It',
+        buildPrompt: function(vals) {
+          var cell = vals.cell ? vals.cell.trim() : '';
+          var ctx = vals.context ? vals.context.trim() : '';
+          var base = cell ? 'Prove the number in ' + cell : 'Prove your last analysis';
+          return ctx ? base + '. ' + ctx + '.' : base + '.';
+        }
+      },
+      variance_analysis: {
+        title: 'Variance Analysis',
+        icon: '\ud83d\udcca',
+        desc: null,
+        fields: [
+          { key: 'comparison', label: 'Compare', type: 'radio', options: [
+            { value: 'budget', label: 'Actual vs Budget', default: true },
+            { value: 'period', label: 'Period over Period' },
+            { value: 'custom', label: 'Custom' }
+          ]},
+          { key: 'periods', label: null, type: 'text', placeholder: 'e.g. Q4 vs Q3, Jan vs Feb', showWhen: 'comparison=custom' },
+          { key: 'focus', label: 'Focus area (optional)', type: 'text', placeholder: 'e.g. revenue only, COGS breakdown' }
+        ],
+        hint: 'Works best with labeled rows and column headers',
+        buttonLabel: 'Analyze',
+        buildPrompt: function(vals) {
+          var type = vals.comparison === 'period' ? 'period over period' : vals.comparison === 'custom' ? 'custom' : 'actuals to budget';
+          var base = 'Run a variance analysis comparing ' + type;
+          if (vals.comparison === 'custom' && vals.periods && vals.periods.trim()) {
+            base += ' (' + vals.periods.trim() + ')';
+          }
+          base += '.';
+          if (vals.focus && vals.focus.trim()) base += ' Focus on: ' + vals.focus.trim() + '.';
+          return base;
+        }
+      },
+      kpi_dashboard: {
+        title: 'KPI Dashboard',
+        icon: '\ud83d\udcc8',
+        desc: null,
+        fields: [
+          { key: 'location', label: 'Where?', type: 'radio', options: [
+            { value: 'new', label: 'New tab', default: true },
+            { value: 'active', label: 'Active sheet' }
+          ]},
+          { key: 'kpis', label: 'KPIs to include (optional)', type: 'text', placeholder: 'e.g. MRR, churn rate, CAC, runway' }
+        ],
+        hint: 'Leave blank \u2192 auto-detects key metrics from your data',
+        buttonLabel: 'Build Dashboard',
+        buildPrompt: function(vals) {
+          var loc = vals.location === 'active' ? 'on the active sheet' : 'on a new tab';
+          var base = 'Build a KPI dashboard ' + loc + '.';
+          if (vals.kpis && vals.kpis.trim()) base += ' Include these KPIs: ' + vals.kpis.trim() + '.';
+          return base;
+        }
+      },
       workbook_format: {
         title: 'Format & Organize',
-        icon: '\ud83e\uddf9',
+        icon: '\u270f\ufe0f',
         desc: null,
         fields: [
           { key: 'scope', label: 'What to format', type: 'radio', options: [
@@ -3342,8 +3428,8 @@
         }
       },
       tab_audit: {
-        title: 'Workbook Cleanup',
-        icon: '\ud83d\uddc2',
+        title: 'Tab Audit',
+        icon: '\ud83d\udd0d',
         desc: 'Scans all tabs (including hidden) to find unused, empty, or disconnected sheets. You\'ll confirm before anything is changed.',
         fields: [
           { key: 'action', label: 'What should I do?', type: 'radio', options: [
@@ -3352,29 +3438,12 @@
             { value: 'cleanup', label: 'Flag and clean up' }
           ]}
         ],
-        buttonLabel: 'Clean Up Workbook',
+        buttonLabel: 'Audit',
         buildPrompt: function(vals) {
           var base = 'Run a full tab audit on this workbook';
           if (vals.action === 'report') return base + '. Report only \u2014 don\'t make any changes.';
           if (vals.action === 'color') return base + '. Color-code tabs by status.';
           return base + '. Propose deleting empty tabs.';
-        }
-      },
-      prove_it: {
-        title: 'Prove It!',
-        icon: '\u2705',
-        desc: 'Creates a new "Proof" tab that traces every number back to its source cells and formulas \u2014 a dynamic audit trail.',
-        fields: [
-          { key: 'cell', label: 'Which cell or claim?', type: 'range', placeholder: 'e.g. D15' },
-          { key: 'context', label: 'What are you checking? (optional)', type: 'text', placeholder: 'e.g. total revenue looks high' }
-        ],
-        hint: 'Leave blank \u2192 proves last result',
-        buttonLabel: 'Prove It',
-        buildPrompt: function(vals) {
-          var cell = vals.cell ? vals.cell.trim() : '';
-          var ctx = vals.context ? vals.context.trim() : '';
-          var base = cell ? 'Prove the number in ' + cell : 'Prove your last analysis';
-          return ctx ? base + '. ' + ctx + '.' : base + '.';
         }
       },
       explain_tab: {
@@ -3512,12 +3581,14 @@
             '<button class="range-field-btn" id="gf_' + field.key + '_btn" onclick="useSelection(\'' + field.key + '\')">\ud83d\udccd Use Selection</button>';
           wrapper.appendChild(rangeDiv);
         } else if (field.type === 'text') {
+          wrapper.id = 'gf_' + field.key;
+          if (field.showWhen) wrapper.style.display = 'none';
           if (field.label) {
             wrapper.innerHTML = '<label>' + escapeHtml(field.label) + '</label>';
           }
           var inp = document.createElement('input');
           inp.type = 'text';
-          inp.id = 'gf_' + field.key;
+          inp.className = 'gf-input-' + field.key;
           inp.placeholder = field.placeholder || '';
           inp.style.cssText = 'width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;outline:none;';
           wrapper.appendChild(inp);
@@ -3655,7 +3726,14 @@
           vals[field.key] = checked;
         } else {
           var el = document.getElementById('gf_' + field.key);
-          vals[field.key] = el ? el.value : '';
+          if (el && el.tagName === 'INPUT') {
+            vals[field.key] = el.value;
+          } else if (el) {
+            var inp = el.querySelector('input');
+            vals[field.key] = inp ? inp.value : '';
+          } else {
+            vals[field.key] = '';
+          }
         }
       });
 

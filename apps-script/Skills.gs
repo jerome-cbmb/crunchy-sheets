@@ -17,10 +17,64 @@
  */
 var SKILLS = [
   {
+    id: 'formula_xray',
+    name: 'Formula X-Ray',
+    icon: '\ud83d\udd2c',
+    description: 'Trace any formula back to its source cells \u2014 in plain English.',
+    modelTier: 'sonnet',
+    category: 'analysis',
+    showInUI: true
+  },
+  {
+    id: 'prove_it',
+    name: 'Prove It',
+    icon: '\u2705',
+    description: 'Traces every number back to source. No hallucinations \u2014 it shows its work.',
+    modelTier: 'opus',
+    category: 'analysis',
+    showInUI: true
+  },
+  {
     id: 'variance_analysis',
     name: 'Variance Analysis',
     icon: '\ud83d\udcca',
-    description: 'Compare actuals to budget/forecast. Highlights key variances with drill-down explanations.',
+    description: 'Full P&L variance analysis. Top drivers identified, quantified, and explained.',
+    modelTier: 'sonnet',
+    category: 'analysis',
+    showInUI: true
+  },
+  {
+    id: 'kpi_dashboard',
+    name: 'KPI Dashboard',
+    icon: '\ud83d\udcc8',
+    description: 'Build a KPI dashboard with SPARKLINEs, conditional formatting, and live metrics.',
+    modelTier: 'sonnet',
+    category: 'reporting',
+    showInUI: true
+  },
+  {
+    id: 'workbook_format',
+    name: 'Format & Organize',
+    icon: '\u270f\ufe0f',
+    description: 'Blue for hardcodes, black for formulas. Color-code your model so anyone can read it.',
+    modelTier: 'sonnet',
+    category: 'automation',
+    showInUI: true
+  },
+  {
+    id: 'tab_audit',
+    name: 'Tab Audit',
+    icon: '\ud83d\udd0d',
+    description: 'Find unused tabs, orphaned formulas, and cross-reference gaps.',
+    modelTier: 'sonnet',
+    category: 'automation',
+    showInUI: true
+  },
+  {
+    id: 'explain_tab',
+    name: 'Explain This Tab',
+    icon: '\ud83d\udccb',
+    description: 'Walk through the active tab: inputs, calculations, outputs, and purpose.',
     modelTier: 'sonnet',
     category: 'analysis'
   },
@@ -73,14 +127,6 @@ var SKILLS = [
     category: 'modeling'
   },
   {
-    id: 'kpi_dashboard',
-    name: 'KPI Dashboard',
-    icon: '\ud83d\udcc9',
-    description: 'Build a summary dashboard with SPARKLINE charts, conditional formatting, and key metrics.',
-    modelTier: 'sonnet',
-    category: 'reporting'
-  },
-  {
     id: 'investor_metrics',
     name: 'Investor Metrics',
     icon: '\ud83c\udfe6',
@@ -95,51 +141,6 @@ var SKILLS = [
     description: 'Side-by-side budget vs actual with variance %, conditional formatting, and commentary.',
     modelTier: 'sonnet',
     category: 'analysis'
-  },
-  {
-    id: 'workbook_format',
-    name: 'Format & Organize',
-    icon: '\ud83e\uddf9',
-    description: 'Clean up formatting, headers, and layout.',
-    modelTier: 'sonnet',
-    category: 'automation',
-    showInUI: true
-  },
-  {
-    id: 'formula_xray',
-    name: 'Explain a Formula',
-    icon: '\ud83d\udd0d',
-    description: 'Break down any formula in plain English.',
-    modelTier: 'sonnet',
-    category: 'analysis',
-    showInUI: true
-  },
-  {
-    id: 'prove_it',
-    name: 'Prove It!',
-    icon: '\u2705',
-    description: 'Build a proof tab tracing numbers to source data.',
-    modelTier: 'opus',
-    category: 'analysis',
-    showInUI: true
-  },
-  {
-    id: 'tab_audit',
-    name: 'Workbook Cleanup',
-    icon: '\ud83d\uddc2',
-    description: 'Identify unused, empty, or disconnected tabs.',
-    modelTier: 'sonnet',
-    category: 'automation',
-    showInUI: true
-  },
-  {
-    id: 'explain_tab',
-    name: 'Explain This Tab',
-    icon: '\ud83d\udccb',
-    description: 'Walk through the active tab: inputs, calculations, outputs, and purpose.',
-    modelTier: 'sonnet',
-    category: 'analysis',
-    showInUI: true
   }
 ];
 

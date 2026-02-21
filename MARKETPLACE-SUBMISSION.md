@@ -7,10 +7,10 @@ This checklist maps Google's required + recommended assets to what we have ready
 ### ✅ REQUIRED
 
 **1. App Name & Description**
-- [ ] App name: "Crunchy Sheets — AI CFO for Google Sheets"
-- [ ] Short description (< 80 chars): "Financial analyst in your spreadsheet"
-- [ ] Long description (< 4000 chars): [NEEDS WRITTEN]
-- [ ] Category: Finance / Accounting
+- [x] App name: "Crunchy Sheets — AI CFO for Google Sheets"
+- [x] Short description (< 80 chars): "Financial analyst in your spreadsheet"
+- [x] Long description (< 4000 chars): ✅ WRITTEN — see MARKETPLACE-DESCRIPTION.md
+- [x] Category: Finance / Accounting
 
 **2. Icons & Images**
 - [ ] App icon (128×128 px): [CHECK marketplace-assets/]
@@ -20,15 +20,15 @@ This checklist maps Google's required + recommended assets to what we have ready
 - [ ] Demo video (< 30 sec): [✅ demo-5sec.mp4]
 
 **3. Privacy & Security**
-- [ ] Privacy policy URL: https://crunchy.tools/privacy
+- [x] Privacy policy URL: https://crunchy.tools/privacy-policy (note: /privacy redirects to /privacy-policy)
 - [ ] Data usage statement: [VERIFY]
-- [ ] OAuth scopes: [✅ in appsscript.json]
+- [x] OAuth scopes: [✅ in appsscript.json]
 
 **4. Support & Contact**
-- [ ] Support email: [TBD]
-- [ ] Developer name: Gary Gurevich / Crunchy Numbers
-- [ ] Developer website: https://crunchy.tools
-- [ ] Support URL: https://github.com/brklyngg/crunchy-sheets
+- [ ] Support email: [TBD — options: contact@, support@, gary@ crunchy.tools]
+- [x] Developer name: Gary Gurevich / Crunchy Numbers
+- [x] Developer website: https://crunchy.tools
+- [x] Support URL: https://github.com/brklyngg/crunchy-sheets
 
 ---
 
@@ -40,14 +40,18 @@ marketplace-assets/
 ├── banner-220x140.png
 ├── demo-5sec.mp4
 ├── demo-5sec-square.mp4
-└── frame_01.png → frame_24.png (24 total screenshots)
+└── frame_01.png → frame_27.png (27 total screenshots)
 ```
 
-### 🟡 Needs Review
-- Long-form description (positioning copy from Gary)
-- Support email address
-- Privacy policy verification
-- Screenshot selection (top 3-5 frames)
+### 🟢 Ready for Submission
+- [x] Long-form description ✅ WRITTEN (see MARKETPLACE-DESCRIPTION.md)
+- [x] Privacy policy URL ✅ VERIFIED (https://crunchy.tools/privacy-policy)
+- [x] Screenshot recommendations ✅ SUGGESTED (Frames 03, 08/09, 15/16, 22/23, 26/27)
+
+### 🟡 Needs Gary Input (3 items)
+1. **Support email** — which crunchy.tools email? (contact@, support@, gary@?)
+2. **Screenshot picks confirmation** — Gary reviews the 5 recommended frames
+3. **Privacy policy test** — Gary confirms https://crunchy.tools/privacy-policy loads correctly
 
 ---
 

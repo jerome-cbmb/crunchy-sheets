@@ -63,9 +63,9 @@ var SKILLS = [
   },
   {
     id: 'tab_audit',
-    name: 'Tab Audit',
-    icon: '\ud83d\udd0d',
-    description: 'Find unused tabs, orphaned formulas, and cross-reference gaps.',
+    name: 'Find Unused Tabs',
+    icon: '\ud83e\uddf9',
+    description: 'Find tabs that are safe to delete — empty, disconnected, or scratch tabs.',
     modelTier: 'sonnet',
     category: 'automation',
     showInUI: true

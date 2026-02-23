@@ -1484,7 +1484,7 @@
       <button id="sendBtn" onclick="send()">Send</button>
       <div id="imagePreview" style="display:none"></div>
       <div class="keyboard-hint">Enter to send · Shift+Enter for new line</div>
-      <div class="sidebar-footer"><a onclick="showFeedbackForm()"><b>Send feedback</b></a> · v1.0</div>
+      <div class="sidebar-footer"><a onclick="showFeedbackForm()"><b>Send feedback</b></a> · v1.1</div>
     </div>
   </div>
 
@@ -1568,7 +1568,7 @@
       { cmd: '/xray', desc: 'Explain a formula', skill: 'formula_xray' },
       { cmd: '/format', desc: 'Format & organize workbook', skill: 'workbook_format' },
       { cmd: '/prove', desc: 'Build proof tab', skill: 'prove_it' },
-      { cmd: '/audit', desc: 'Audit tabs for unused sheets', skill: 'tab_audit' },
+      { cmd: '/audit', desc: 'Find unused tabs to delete', skill: 'tab_audit' },
       { cmd: '/rescan', desc: 'Rescan workbook structure', skill: null },
       { cmd: '/explain', desc: 'Explain the active tab', skill: 'explain_tab' }
     ];
@@ -1676,8 +1676,8 @@
       if (auditMatch) {
         var auditInstruction = auditMatch[1].trim();
         text = auditInstruction
-          ? 'Audit tabs: ' + auditInstruction
-          : 'Run a full tab audit on this workbook';
+          ? 'Find deletable tabs: ' + auditInstruction
+          : 'Find tabs that are safe to delete in this workbook';
         selectedSkill = 'tab_audit';
       }
 
@@ -2951,7 +2951,7 @@
 
       if (hasFormat) {
         return [
-          { text: 'Audit tabs for unused sheets', skill: 'tab_audit' },
+          { text: 'Find unused tabs to delete', skill: 'tab_audit' },
           { text: 'Any more cleanup needed?', skill: 'workbook_format' }
         ];
       }
@@ -3522,22 +3522,13 @@
         }
       },
       tab_audit: {
-        title: 'Tab Audit',
-        icon: '\ud83d\udd0d',
-        desc: 'Scans all tabs (including hidden) to find unused, empty, or disconnected sheets. You\'ll confirm before anything is changed.',
-        fields: [
-          { key: 'action', label: 'What should I do?', type: 'radio', options: [
-            { value: 'report', label: 'Just tell me what you find', default: true },
-            { value: 'color', label: 'Color-code tabs by status' },
-            { value: 'cleanup', label: 'Flag and clean up' }
-          ]}
-        ],
-        buttonLabel: 'Audit',
-        buildPrompt: function(vals) {
-          var base = 'Run a full tab audit on this workbook';
-          if (vals.action === 'report') return base + '. Report only \u2014 don\'t make any changes.';
-          if (vals.action === 'color') return base + '. Color-code tabs by status.';
-          return base + '. Propose deleting empty tabs.';
+        title: 'Find Unused Tabs',
+        icon: '\ud83e\uddf9',
+        desc: 'Scans all tabs to find ones that are safe to delete \u2014 empty, disconnected, or scratch tabs. You pick which to remove.',
+        fields: [],
+        buttonLabel: 'Scan',
+        buildPrompt: function() {
+          return 'Find tabs that are safe to delete in this workbook';
         }
       },
       explain_tab: {

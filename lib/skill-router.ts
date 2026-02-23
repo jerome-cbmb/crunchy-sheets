@@ -247,34 +247,37 @@ Do NOT include an "actions" array. Do NOT include a "response" field. Return ONL
     modelTier: 'sonnet',
     maxTokens: 8192,
     useFullContext: true,
-    keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs|get\s*rid\s*of.*tab|remove.*unused|which\s*tabs.*used|unnecessary\s*tab|check\s+(my\s+)?tabs|workbook.*clean|clean.*workbook/i,
-    instruction: 'Audit every tab in this workbook. Classify each as Connected, Isolated, Empty, or Scratch based on the cross-reference graph. Flag problematic tabs with color-coded actions.',
+    keywords: /tab.*audit|unused.*tab|orphan.*tab|dead.*tab|tab.*cleanup|clean\s*up\s*tabs|get\s*rid\s*of.*tab|remove.*unused|which\s*tabs.*used|unnecessary\s*tab|check\s+(my\s+)?tabs|workbook.*clean|clean.*workbook|find\s*unused/i,
+    instruction: 'Find tabs that are safe to delete. Rank by cleanup value (largest useless tabs first). Return only delete_sheet actions.',
     systemAddendum: `
-TAB AUDIT MODE — identify unused, orphan, and scratch tabs.
+FIND UNUSED TABS — identify tabs that are safe to delete.
 
 You will receive a cross-reference graph in the user message under "## Cross-Reference Graph". This graph was built by scanning ALL formulas across ALL sheets (including hidden ones), so it captures every cross-sheet reference — not just what's visible in bookend summaries.
 
-If no cross-reference graph is present, respond: "Tab audit requires a cross-reference graph — please try again."
+If no cross-reference graph is present, respond: "This skill requires a cross-reference graph — please try again."
 
-CLASSIFICATION (4 categories):
-1. **Connected** — has inbound refs (another sheet references it) OR outbound refs (it references another sheet). These are part of the model. No action needed.
-2. **Isolated** — has data (dataRows > 0, isEmpty = false), but zero inbound AND zero outbound refs. Orphan tab — not connected to anything. Action: set_tab_color orange (#fa7b17) + add_note on A1 explaining it's isolated.
-3. **Empty** — zero data rows (isEmpty = true). Action: set_tab_color red (#ea4335) + add_note on A1 + delete_sheet.
-4. **Scratch** — name matches scratch pattern (Sheet1, Sheet2, Copy of..., test, temp) regardless of data content. Action: set_tab_color red (#ea4335) + add_note on A1 suggesting rename or delete.
-
-Note: A sheet can be both Scratch AND (Empty or Isolated). Scratch takes priority in classification.
+CLASSIFICATION (used internally to determine safety):
+1. **Connected** — has inbound refs (another sheet references it) OR outbound refs (it references another sheet). These are IN USE. Omit entirely from results.
+2. **Isolated** — has data (dataRows > 0, isEmpty = false), but zero inbound AND zero outbound refs. Deletable — orphan tab not connected to anything.
+3. **Empty** — zero data rows (isEmpty = true). Deletable.
+4. **Scratch** — name matches scratch pattern (Sheet1, Sheet2, Copy of..., test, temp) regardless of data content. Deletable.
 
 INBOUND REFS: Check the \`inbound\` map — \`inbound[sheetName]\` lists all sheets that reference it. Empty array or missing key = no inbound refs.
 OUTBOUND REFS: Sheet X has outbound refs if its own refs[] array is non-empty.
 
-HIDDEN SHEETS: Sheets with isHidden=true appear in the graph but NOT in the workbook state. Include them in the audit table with a "(hidden)" note.
+RANKING: Order deletable tabs by cleanup value (descending):
+1. Largest isolated tabs first (most rows of disconnected data)
+2. Then scratch tabs
+3. Then empty tabs
 
 RESPONSE FORMAT:
-1. Markdown table: Tab Name | Status | Reason (one row per sheet)
-2. Summary line: "X of Y tabs flagged (Z connected, ...)"
-3. If any sheet has hasIndirect=true, add warning: "⚠ Some tabs use INDIRECT() — dynamic references can't be statically traced. Review these manually."
-4. Tab color legend: Connected = no change, Isolated = orange, Empty = red (deleted), Scratch = red
-5. Max 3 actions per flagged tab (set_tab_color + add_note + optionally delete_sheet for empty)
+- Numbered list of deletable tabs. Each entry: tab name, reason (Empty / Isolated / Scratch), estimated row count
+- Summary line: "Found X tabs safe to delete out of Y total."
+- If any sheet has hasIndirect=true, add warning: "⚠ Some tabs use INDIRECT() — dynamic references can't be statically traced. Review these manually before deleting."
+- If zero tabs are deletable: say "All tabs are connected — nothing safe to delete." with empty actions array
+- Do NOT include Connected tabs in the response at all
+
+ACTIONS: Return ONLY delete_sheet actions — one per deletable tab. No set_tab_color, no add_note. The user will confirm which to apply.
 
 Return the standard JSON with actions[] array, response text, and summary.`,
   },

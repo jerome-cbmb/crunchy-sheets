@@ -148,7 +148,7 @@ Routing: explicit selection from sidebar chip → `[skill:xxx]` prefix in prompt
 | Explain This Tab | Sonnet | analysis | `/explain` — structured walkthrough: purpose, inputs, calculations, outputs, connections |
 | Formula X-Ray | Sonnet | analysis | `/xray` — read-only; BFS-traced hybrid payload (no full serialization). Supports multi-cell ranges. Tie-out verification |
 | Prove It | Opus | analysis | `/prove` — builds auditable proof tab tracing numbers to source cells |
-| Tab Audit | Sonnet | automation | `/audit` — scans cross-ref graph to classify tabs as Connected/Isolated/Empty/Scratch |
+| Find Unused Tabs | Sonnet | automation | `/audit` — scans cross-ref graph, returns only `delete_sheet` actions for tabs safe to delete (Isolated/Empty/Scratch), ranked by cleanup value |
 
 Sonnet skills are fast/cheap. Opus skills require deeper reasoning. **explain_tab is defined BEFORE formula_xray in `SKILL_DEFINITIONS`** — keyword iteration is array-order, so "walk me through this tab" matches explain_tab first while "walk me through this formula" matches formula_xray.
 

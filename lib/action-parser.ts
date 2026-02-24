@@ -95,7 +95,7 @@ function validateAction(action: any): ValidationResult {
   }
 
   const type = action.type;
-  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'freeze_cols', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet'].includes(type)) {
+  if (!type || !['set_value', 'set_formula', 'format_cell', 'add_sheet', 'rename_sheet', 'add_named_range', 'activate_sheet', 'set_column_width', 'freeze_rows', 'freeze_cols', 'format_range', 'set_border', 'auto_resize_columns', 'delete_sheet', 'set_tab_color', 'add_note', 'move_sheet', 'run_script'].includes(type)) {
     return { valid: false, error: `Invalid action type: ${type}` };
   }
 
@@ -208,6 +208,15 @@ function validateAction(action: any): ValidationResult {
         return { valid: false, error: 'move_sheet requires sheet and position' };
       }
       break;
+
+    case 'run_script':
+      if (!action.script || typeof action.script !== 'string') {
+        return { valid: false, error: 'run_script requires a script string' };
+      }
+      if (!action.description || typeof action.description !== 'string') {
+        return { valid: false, error: 'run_script requires a description string' };
+      }
+      break;
   }
 
   return { valid: true, action };
@@ -236,7 +245,8 @@ When you modify a workbook, return your response as a JSON object with this stru
     { "type": "delete_sheet", "sheet": "Sheet3" },
     { "type": "set_tab_color", "sheet": "Assumptions", "color": "#4285f4" },
     { "type": "add_note", "sheet": "Assumptions", "cell": "B3", "note": "Key growth driver" },
-    { "type": "move_sheet", "sheet": "Dashboard", "position": 1 }
+    { "type": "move_sheet", "sheet": "Dashboard", "position": 1 },
+    { "type": "run_script", "sheet": "Kittens", "script": "var s = ss.getSheetByName('Kittens'); var vals = []; for (var r = 0; r < 10; r++) { var row = []; for (var c = 0; c < 10; c++) row.push('🐱'); vals.push(row); } s.getRange(1,1,10,10).setValues(vals);", "description": "Fill A1:J10 with cat emojis" }
   ],
   "response": "I've set up the revenue forecast with growth rate input...",
   "summary": "Created Assumptions sheet with 5 key inputs"
@@ -250,5 +260,6 @@ When you modify a workbook, return your response as a JSON object with this stru
 - Cell references are A1 notation (e.g., "B14", not "B14:B14").
 - Use actual hex color codes (e.g., "#0000FF" for blue).
 - For formulas, ensure they reference the correct sheets.
+- For bulk operations, patterns, or anything requiring many repeated actions, use \`run_script\` with a concise GAS snippet. The script receives \`ss\` (active spreadsheet) and \`SpreadsheetApp\` in scope. Always include a \`description\` for the user preview.
 `;
 }

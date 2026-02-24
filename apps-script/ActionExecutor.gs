@@ -127,6 +127,9 @@ function _executeSingleAction(ss, action, index) {
     case 'move_sheet':
       return _execMoveSheet(ss, action);
 
+    case 'run_script':
+      return _execRunScript(ss, action);
+
     default:
       throw new Error('Unknown action type: ' + action.type);
   }
@@ -518,6 +521,29 @@ function _execMoveSheet(ss, action) {
 }
 
 /**
+ * run_script — Execute a concise GAS snippet for bulk operations.
+ * Expected fields: { type, script, description, sheet? }
+ * The script receives `ss` (active spreadsheet) and `SpreadsheetApp` in scope.
+ * Dangerous APIs outside spreadsheet scope are blocked.
+ */
+function _execRunScript(ss, action) {
+  var script = action.script;
+  if (!script || typeof script !== 'string') {
+    throw new Error('run_script requires a script string');
+  }
+
+  // Block dangerous APIs that go beyond spreadsheet scope
+  var forbidden = /\b(ScriptApp|PropertiesService|DriveApp|GmailApp|MailApp|UrlFetchApp|ContentService|HtmlService|CacheService|Session)\b/;
+  if (forbidden.test(script)) {
+    throw new Error('Script contains restricted APIs');
+  }
+
+  var fn = new Function('ss', 'SpreadsheetApp', 'Logger', script);
+  fn(ss, SpreadsheetApp, Logger);
+  return { skipped: false };
+}
+
+/**
  * Convert column letter(s) to a 1-based column number.
  * A=1, Z=26, AA=27, AZ=52, etc.
  */
@@ -642,6 +668,9 @@ function _describeAction(action) {
 
     case 'move_sheet':
       return 'Move "' + action.sheet + '" to position ' + action.position;
+
+    case 'run_script':
+      return action.description || 'Run custom script';
 
     default:
       return action.type + ' (unknown)';

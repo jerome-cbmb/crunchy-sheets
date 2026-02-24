@@ -103,7 +103,7 @@ crunchy-sheets/
 └── README.md
 ```
 
-## 16 Action Types
+## 17 Action Types
 
 Claude returns these in the `actions[]` array. ActionExecutor.gs applies them to the spreadsheet.
 
@@ -125,6 +125,7 @@ Claude returns these in the `actions[]` array. ActionExecutor.gs applies them to
 | `set_tab_color` | sheet, color | Set a sheet's tab color (hex) |
 | `add_note` | sheet, cell, note | Add a note to a cell |
 | `move_sheet` | sheet, position | Move a sheet to a position (1-indexed) |
+| `run_script` | script, description | Execute a GAS snippet for bulk operations. Script receives `ss` (active spreadsheet) and `SpreadsheetApp` in scope. Forbidden-API regex blocks ScriptApp, DriveApp, GmailApp, MailApp, UrlFetchApp, ContentService, HtmlService, CacheService, Session, PropertiesService. Optional `sheet` for context. |
 
 Each action is independently try/caught — one failure doesn't stop the batch.
 
@@ -269,7 +270,7 @@ RLS enabled on all tables, service role bypasses.
 ## Key Design Decisions
 
 - **Three payload paths:** (1) Structural model (~2-5K tokens) for most requests — cached in `DocumentCache` (6h TTL), invalidated on structural changes + inline staleness check on active sheet. (2) X-Ray hybrid — structural model + BFS-traced reference chain via `buildFormulaXrayPayload()` (3 levels, 100 cells max). (3) Full serialization for 3 skills (format, prove_it, tab_audit). 120K token budget with graceful degradation, 150K hard guard.
-- **Streaming via Vercel:** Sidebar calls Vercel directly via `fetch()` + `ReadableStream`. Response renders progressively. Apps Script is bypassed for the AI call (only used for workbook serialization and action execution).
+- **Streaming via Vercel:** Sidebar calls Vercel directly via `fetch()` + `ReadableStream` with 75s `AbortController` timeout. Response renders progressively. On timeout, spinner clears and user sees "Request timed out" message. Apps Script is bypassed for the AI call (only used for workbook serialization and action execution).
 - **Thinking steps:** Progressive indicators show what's happening at each phase (reading → analyzing → fetching → verifying). Appear as pills in `#messages`, auto-dismissed via `clearThinkingSteps()`. Cache warmup step auto-dismisses on hit.
 - **Image input:** `+` button or drag-and-drop on input area. 4MB raw file limit (checked before base64 encoding). Sent as `imageBase64` in fetch body, Vercel wraps into multimodal content array. Bypasses Apps Script entirely.
 - **Compact chat history:** `saveChatState()` stores `{role, text}` JSON objects (~50-100 bytes each) instead of raw `outerHTML` (~2-4KB each). Backward-compatible — old HTML format is discarded on first restore.

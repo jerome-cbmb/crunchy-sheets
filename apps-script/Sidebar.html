@@ -1509,9 +1509,12 @@
         .withSuccessHandler(function(meta) {
           cacheMeta = meta;
           if (!meta.cached && warmStep) {
-            completeThinkingStep(warmStep);
+            // Freshly built cache — show completion message
+            var msg = '✓ Ready — read ' + meta.sheetCount + ' tab' + (meta.sheetCount === 1 ? '' : 's');
+            completeThinkingStep(warmStep, msg);
             setTimeout(function() { clearThinkingSteps(); }, 2000);
-          } else {
+          } else if (meta.cached && warmStep) {
+            // Cache was already warm — auto-dismiss quietly
             clearThinkingSteps();
           }
         })
@@ -1745,28 +1748,56 @@
         return;
       }
 
-      // Step 1: Get payload from Apps Script (structural or full, based on skill)
-      google.script.run
-        .withSuccessHandler(function(payload) {
-          // Complete the "Reading workbook data..." step
-          var stepsDiv = document.getElementById('messages').querySelector('.thinking-steps');
-          if (stepsDiv) {
-            var lastStep = stepsDiv.querySelector('.thinking-step:last-child');
-            if (lastStep) completeThinkingStep(lastStep);
-          }
-          if (payload.isStructuralPass) {
-            streamStructuralAnalysis(payload, fullPrompt, activeSkill, imageForThisRequest);
-          } else {
-            streamAnalysis(payload, activeSkill, imageForThisRequest);
-          }
-        })
-        .withFailureHandler(function(err) {
-          setLoading(false);
-          clearThinkingSteps();
-          removeTypingIndicator();
-          addMessage('\u26a0 Error preparing request: ' + err.message, 'system');
-        })
-        .getStructuralPayload(fullPrompt, activeSkill || null);
+      // Step 1: Check staleness + refresh if needed
+      var proceedWithRequest = function() {
+        google.script.run
+          .withSuccessHandler(function(payload) {
+            // Complete the "Reading workbook data..." step
+            var stepsDiv = document.getElementById('messages').querySelector('.thinking-steps');
+            if (stepsDiv) {
+              var lastStep = stepsDiv.querySelector('.thinking-step:last-child');
+              if (lastStep) completeThinkingStep(lastStep);
+            }
+            if (payload.isStructuralPass) {
+              streamStructuralAnalysis(payload, fullPrompt, activeSkill, imageForThisRequest);
+            } else {
+              streamAnalysis(payload, activeSkill, imageForThisRequest);
+            }
+          })
+          .withFailureHandler(function(err) {
+            setLoading(false);
+            clearThinkingSteps();
+            removeTypingIndicator();
+            addMessage('\u26a0 Error preparing request: ' + err.message, 'system');
+          })
+          .getStructuralPayload(fullPrompt, activeSkill || null);
+      };
+
+      // Check if structural model is stale before proceeding
+      if (cacheMeta && typeof checkStaleness === 'function') {
+        var staleCheck = checkStaleness(cacheMeta);
+        if (staleCheck && staleCheck.stale) {
+          // Model is stale — refresh it first
+          var refreshStep = addThinkingStep('\ud83d\udd04', 'Refreshing workbook knowledge...');
+          google.script.run
+            .withSuccessHandler(function(meta) {
+              cacheMeta = meta;
+              completeThinkingStep(refreshStep);
+              proceedWithRequest();
+            })
+            .withFailureHandler(function(err) {
+              setLoading(false);
+              clearThinkingSteps();
+              removeTypingIndicator();
+              addMessage('\u26a0 Failed to refresh workbook knowledge: ' + err.message, 'system');
+            })
+            .rescanStructuralCache();
+          return;
+        }
+      }
+      
+      // Model is fresh — proceed immediately
+      proceedWithRequest();
     }
 
     // ─── Streaming ───────────────────────────────────────────────────────

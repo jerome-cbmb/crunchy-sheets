@@ -307,6 +307,45 @@ function getSheetNames() {
   });
 }
 
+/**
+ * Check if the structural model is stale by comparing current workbook shape
+ * to a previously cached metadata snapshot.
+ * Used in the sidebar before sending requests to detect if we need a rescan.
+ *
+ * @param {Object} cachedMeta - Previous metadata from warmStructuralCache()
+ *   Shape: { sheetNames: string[], sheetCount: number, activeSheet: string, ... }
+ * @return {Object} { stale: boolean, reason: string }
+ *   Reason is only set if stale=true (e.g., "Sheet count changed", "Sheet renamed")
+ */
+function checkStaleness(cachedMeta) {
+  if (!cachedMeta) {
+    return { stale: true, reason: 'No cached metadata provided' };
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var currentSheetNames = sheets.map(function(s) { return s.getName(); });
+  var currentActiveSheet = ss.getActiveSheet().getName();
+  var currentSheetCount = sheets.length;
+
+  // Check for structural changes
+  if (currentSheetCount !== cachedMeta.sheetCount) {
+    return { stale: true, reason: 'Sheet count changed' };
+  }
+
+  // Check if sheet names changed (order or names)
+  if (JSON.stringify(currentSheetNames) !== JSON.stringify(cachedMeta.sheetNames)) {
+    return { stale: true, reason: 'Sheet names or order changed' };
+  }
+
+  // Check if active sheet changed (only matters for some analyses)
+  if (currentActiveSheet !== cachedMeta.activeSheet) {
+    return { stale: true, reason: 'Active sheet changed' };
+  }
+
+  return { stale: false, reason: '' };
+}
+
 // ─── Chat History Persistence ───────────────────────────────────────────────
 
 /**

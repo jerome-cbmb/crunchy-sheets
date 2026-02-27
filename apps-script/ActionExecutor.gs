@@ -31,8 +31,10 @@ function executeActions(actions) {
   var skipped = 0;
   var errors = [];
   var skipReasons = [];
+  var t0 = Date.now();
 
   if (!actions || !Array.isArray(actions)) {
+    _logActionRun(0, 0, ['No valid actions array provided'], Date.now() - t0);
     return { applied: 0, skipped: 0, errors: ['No valid actions array provided'], skipReasons: [] };
   }
 
@@ -54,7 +56,9 @@ function executeActions(actions) {
     }
   }
 
-  Logger.log('[ActionExecutor] Complete — applied: ' + applied + ', skipped: ' + skipped + ', errors: ' + errors.length);
+  var durationMs = Date.now() - t0;
+  Logger.log('[ActionExecutor] Complete — applied: ' + applied + ', skipped: ' + skipped + ', errors: ' + errors.length + ' (' + durationMs + 'ms)');
+  _logActionRun(applied, skipped, errors, durationMs);
 
   return {
     applied: applied,
@@ -62,6 +66,51 @@ function executeActions(actions) {
     errors: errors,
     skipReasons: skipReasons
   };
+}
+
+// ─── Execution Logging ───────────────────────────────────────────────────────
+
+/**
+ * Log an action batch execution to the _CrunchyLog sheet.
+ * Creates the sheet on first use (hidden, grey tab). Rotates at 10K rows.
+ * Entire function is wrapped in try/catch — a log failure never breaks Apply.
+ *
+ * @param {number} applied - Number of actions applied.
+ * @param {number} skipped - Number of actions skipped.
+ * @param {string[]} errors - Error messages from the batch.
+ * @param {number} durationMs - Execution duration in milliseconds.
+ */
+function _logActionRun(applied, skipped, errors, durationMs) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var LOG_SHEET_NAME = '_CrunchyLog';
+    var MAX_ROWS = 10000;
+
+    var sheet = ss.getSheetByName(LOG_SHEET_NAME);
+    if (!sheet) {
+      sheet = ss.insertSheet(LOG_SHEET_NAME);
+      sheet.setTabColor('#cccccc');
+      sheet.hideSheet();
+      var headers = [['Timestamp', 'Applied', 'Skipped', 'Errors', 'Duration (ms)', 'Error Detail']];
+      sheet.getRange(1, 1, 1, 6).setValues(headers);
+      sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
+      sheet.setFrozenRows(1);
+    }
+
+    // Rotate: when over MAX_ROWS, delete the oldest half of data rows
+    var lastRow = sheet.getLastRow();
+    if (lastRow > MAX_ROWS) {
+      var halfToDelete = Math.floor(MAX_ROWS / 2);
+      sheet.deleteRows(2, halfToDelete); // row 2 = first data row (header is row 1)
+    }
+
+    var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    var errorDetail = errors.length > 0 ? errors.slice(0, 3).join(' | ') : '';
+    sheet.appendRow([timestamp, applied, skipped, errors.length, durationMs, errorDetail]);
+  } catch (logErr) {
+    // Intentionally swallowed — logging must never break the apply workflow
+    Logger.log('[_logActionRun] Logging failed: ' + logErr.message);
+  }
 }
 
 // ─── Single Action Dispatch ──────────────────────────────────────────────────

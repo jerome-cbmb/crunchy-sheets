@@ -123,6 +123,34 @@ function loadActiveSheetOverride() {
 // ─── Backend Communication ───────────────────────────────────────────────────
 
 /**
+ * Fetch with exponential backoff for transient server errors.
+ * Retries on 429 (rate limit) and 5xx (server error) responses only.
+ * Client errors (4xx except 429) fail immediately — no retry.
+ *
+ * @param {string} url - The URL to fetch.
+ * @param {Object} options - UrlFetchApp fetch options (muteHttpExceptions should be true).
+ * @param {number} [maxAttempts=3] - Maximum number of attempts (1 = no retry).
+ * @return {GoogleAppsScript.URL_Fetch.HTTPResponse} The final response.
+ */
+function _fetchWithRetry(url, options, maxAttempts) {
+  maxAttempts = maxAttempts || 3;
+  var response;
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    response = UrlFetchApp.fetch(url, options);
+    var code = response.getResponseCode();
+    // Success or non-retriable client error — return immediately
+    if (code < 500 && code !== 429) return response;
+    // Retriable error: log and sleep before next attempt
+    if (attempt < maxAttempts) {
+      var delayMs = Math.pow(2, attempt - 1) * 1000 + Math.floor(Math.random() * 500);
+      Logger.log('[_fetchWithRetry] Attempt ' + attempt + ' got HTTP ' + code + ', retrying in ' + delayMs + 'ms');
+      Utilities.sleep(delayMs);
+    }
+  }
+  return response; // Return last response (even if still an error)
+}
+
+/**
  * Sends the current workbook state + user prompt to the /analyze Cloud Function.
  * Called from the sidebar via google.script.run.
  *
@@ -153,7 +181,7 @@ function analyzeWorkbook(userPrompt) {
     muteHttpExceptions: true
   };
 
-  var response = UrlFetchApp.fetch(CLOUD_FUNCTION_BASE + '/analyze', options);
+  var response = _fetchWithRetry(CLOUD_FUNCTION_BASE + '/analyze', options);
   var responseCode = response.getResponseCode();
   var responseText = response.getContentText();
 
@@ -243,7 +271,7 @@ function runHealthCheck() {
     muteHttpExceptions: true
   };
 
-  var response = UrlFetchApp.fetch(CLOUD_FUNCTION_BASE + '/analyze', options);
+  var response = _fetchWithRetry(CLOUD_FUNCTION_BASE + '/analyze', options);
   var responseCode = response.getResponseCode();
   var responseText = response.getContentText();
 
